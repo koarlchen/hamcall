@@ -9,7 +9,7 @@ pub struct Callsign {
     // Prefix of home callsign
     pub prefix: String,
     // Number of home callsign
-    pub number: u16,
+    pub number: String,
     // Suffix of home callsing
     pub suffix: String,
     // Additional prefix
@@ -21,8 +21,8 @@ pub struct Callsign {
 impl Callsign {
     // Get complete callsign
     pub fn call(&self) -> String {
-        let str_prefix = if self.add_prefix.is_some() {
-            format!("{}/", self.prefix)
+        let str_prefix = if let Some(val) = self.add_prefix.clone() {
+            format!("{}/", val)
         } else {
             String::new()
         };
@@ -33,7 +33,7 @@ impl Callsign {
             String::new()
         };
 
-        format!("{}{}{}", str_prefix, self.number, str_suffix)
+        format!("{}{}{}", str_prefix, self.homecall(), str_suffix)
     }
 
     // Get home callsign
@@ -56,6 +56,9 @@ pub enum CallsignError {
 
     #[error("Found multiple additional prefixes")]
     MultipleAdditionalPrefixes,
+
+    #[error("Internal error")]
+    InternalError,
 }
 
 /// Analyze callsign and split it into its parts.
@@ -73,8 +76,10 @@ pub enum CallsignError {
 pub fn analyze_callsign(call: &str) -> Result<Callsign, CallsignError> {
     lazy_static! {
         static ref RE_CALL: Regex = Regex::new(r"^[A-Z0-9]+[A-Z0-9/]*[A-Z0-9]+$").unwrap();
-        static ref RE_HOME_CALL: Regex =
-            Regex::new(r"((\d[A-Z])(\d{1,4})([A-Z]+))|(([A-Z]+)(\d{1,4})([A-Z]+))").unwrap();
+        static ref RE_HOME_CALL: Regex = Regex::new(
+            r"(?:^|/)((\d[A-Z]+)(\d{1,4})([A-Z]+))(?:$|/)|(?:^|/)(([A-Z]+)(\d{1,4})([A-Z]+))(?:$|/)"
+        )
+        .unwrap();
         static ref RE_SUFFIX: Regex = Regex::new(r"/[A-Z0-9]+").unwrap();
     }
 
@@ -103,12 +108,7 @@ pub fn analyze_callsign(call: &str) -> Result<Callsign, CallsignError> {
 
         // Extract homecalls prefix, number and suffix (unwraps are safe due to pre-calculated offset and used regex)
         let prefix = first_match.get(group_offset + 1).unwrap().as_str().into();
-        let number = first_match
-            .get(group_offset + 2)
-            .unwrap()
-            .as_str()
-            .parse::<u16>()
-            .unwrap();
+        let number = first_match.get(group_offset + 2).unwrap().as_str().into();
         let suffix = first_match.get(group_offset + 3).unwrap().as_str().into();
 
         // Get offset of homecall within complete callsign (unwrap is safe since homecall is part of complete callsign)
@@ -135,13 +135,21 @@ pub fn analyze_callsign(call: &str) -> Result<Callsign, CallsignError> {
             .collect();
 
         // Fill result struct
-        Ok(Callsign {
+        let res = Callsign {
             prefix,
             number,
             suffix,
             add_prefix,
             add_suffix: add_suffixes,
-        })
+        };
+
+        // Basic check that raw input must match the formatted output
+        if res.call() != call {
+            return Err(CallsignError::InternalError);
+        }
+
+        // Return result
+        Ok(res)
     } else {
         Err(CallsignError::NoHomeCall)
     }
