@@ -4,7 +4,7 @@ use std::vec::Vec;
 use thiserror::Error;
 
 /// Callsign
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Callsign {
     // Prefix of home callsign
     pub prefix: String,
@@ -152,5 +152,315 @@ pub fn analyze_callsign(call: &str) -> Result<Callsign, CallsignError> {
         Ok(res)
     } else {
         Err(CallsignError::NoHomeCall)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn valid_homecall() {
+        let calls = vec![
+            (
+                "DA1BC",
+                Callsign {
+                    prefix: "DA".into(),
+                    number: "1".into(),
+                    suffix: "BC".into(),
+                    add_prefix: None,
+                    add_suffix: Vec::new(),
+                },
+            ),
+            (
+                "W1AW",
+                Callsign {
+                    prefix: "W".into(),
+                    number: "1".into(),
+                    suffix: "AW".into(),
+                    add_prefix: None,
+                    add_suffix: Vec::new(),
+                },
+            ),
+            (
+                "1A2B",
+                Callsign {
+                    prefix: "1A".into(),
+                    number: "2".into(),
+                    suffix: "B".into(),
+                    add_prefix: None,
+                    add_suffix: Vec::new(),
+                }
+            ),
+            (
+                "DL100FW",
+                Callsign {
+                    prefix: "DL".into(),
+                    number: "100".into(),
+                    suffix: "FW".into(),
+                    add_prefix: None,
+                    add_suffix: Vec::new(),
+                }
+            ),
+            (
+                "DL9999DOK",
+                Callsign {
+                    prefix: "DL".into(),
+                    number: "9999".into(),
+                    suffix: "DOK".into(),
+                    add_prefix: None,
+                    add_suffix: Vec::new(),
+                }
+            ),
+            (
+                "3DA0AQ",
+                Callsign {
+                    prefix: "3DA".into(),
+                    number: "0".into(),
+                    suffix: "AQ".into(),
+                    add_prefix: None,
+                    add_suffix: Vec::new(),
+                }
+            ),
+            (
+                "F04OD", // TODO: Not sure about this one. Is F04OD actually valid?
+                Callsign {
+                    prefix: "F".into(),
+                    number: "04".into(),
+                    suffix: "OD".into(),
+                    add_prefix: None,
+                    add_suffix: Vec::new(),
+                }
+            )
+        ];
+
+        for call in calls.into_iter() {
+            assert_eq!(analyze_callsign(call.0), Ok(call.1));
+        }
+    }
+
+    #[test]
+    fn valid_prefix() {
+        let calls = vec![
+            (
+                "OE/DA1BC",
+                Callsign {
+                    prefix: "DA".into(),
+                    number: "1".into(),
+                    suffix: "BC".into(),
+                    add_prefix: Some("OE".into()),
+                    add_suffix: Vec::new(),
+                }
+            ),
+            (
+                "OE1/DA1BC",
+                Callsign {
+                    prefix: "DA".into(),
+                    number: "1".into(),
+                    suffix: "BC".into(),
+                    add_prefix: Some("OE1".into()),
+                    add_suffix: Vec::new(),
+                }
+            ),
+            (
+                "1A/DA1BC",
+                Callsign {
+                    prefix: "DA".into(),
+                    number: "1".into(),
+                    suffix: "BC".into(),
+                    add_prefix: Some("1A".into()),
+                    add_suffix: Vec::new(),
+                }
+            ),
+            (
+                "W1/DA1BC",
+                Callsign {
+                    prefix: "DA".into(),
+                    number: "1".into(),
+                    suffix: "BC".into(),
+                    add_prefix: Some("W1".into()),
+                    add_suffix: Vec::new(),
+                }
+            ),
+        ];
+
+        for call in calls.into_iter() {
+            assert_eq!(analyze_callsign(call.0), Ok(call.1));
+        }
+    }
+
+    #[test]
+    fn valid_suffix() {
+        let calls = vec![
+            (
+                "DA1BC/P",
+                Callsign {
+                    prefix: "DA".into(),
+                    number: "1".into(),
+                    suffix: "BC".into(),
+                    add_prefix: None,
+                    add_suffix: vec!["P".into()],
+                }
+            ),
+            (
+                "DA1BC/5",
+                Callsign {
+                    prefix: "DA".into(),
+                    number: "1".into(),
+                    suffix: "BC".into(),
+                    add_prefix: None,
+                    add_suffix: vec!["5".into()],
+                }
+            ),
+            (
+                "DA1BC/EA5",
+                Callsign {
+                    prefix: "DA".into(),
+                    number: "1".into(),
+                    suffix: "BC".into(),
+                    add_prefix: None,
+                    add_suffix: vec!["EA5".into()],
+                }
+            ),
+            (
+                "DA1BC/LH",
+                Callsign {
+                    prefix: "DA".into(),
+                    number: "1".into(),
+                    suffix: "BC".into(),
+                    add_prefix: None,
+                    add_suffix: vec!["LH".into()],
+                }
+            ),
+            (
+                "DA1BC/1A",
+                Callsign {
+                    prefix: "DA".into(),
+                    number: "1".into(),
+                    suffix: "BC".into(),
+                    add_prefix: None,
+                    add_suffix: vec!["1A".into()],
+                }
+            ),
+            (
+                "DA1BC/P/LH",
+                Callsign {
+                    prefix: "DA".into(),
+                    number: "1".into(),
+                    suffix: "BC".into(),
+                    add_prefix: None,
+                    add_suffix: vec!["P".into(), "LH".into()],
+                }
+            ),
+            (
+                "DA1BC/P/LH/ABC",
+                Callsign {
+                    prefix: "DA".into(),
+                    number: "1".into(),
+                    suffix: "BC".into(),
+                    add_prefix: None,
+                    add_suffix: vec!["P".into(), "LH".into(), "ABC".into()],
+                }
+            ),
+        ];
+
+        for call in calls.into_iter() {
+            assert_eq!(analyze_callsign(call.0), Ok(call.1));
+        }
+    }
+
+    #[test]
+    fn invalid_something() {
+        let calls = [
+            (
+                "/DA1BC",
+                CallsignError::InvalidFormat,
+            ),
+            (
+                "DA1BC/",
+                CallsignError::InvalidFormat,
+            ),
+            (
+                "/DA1BC/",
+                CallsignError::InvalidFormat,
+            ),
+            (
+                "DAIBC",
+                CallsignError::NoHomeCall,
+            ),
+            (
+                "OE/DAIBC",
+                CallsignError::NoHomeCall,
+            ),
+            (
+                "1ABC",
+                CallsignError::NoHomeCall,
+            ),
+            (
+                "1ABC/P",
+                CallsignError::NoHomeCall,
+            ),
+            (
+                "DA1BC2",
+                CallsignError::NoHomeCall,
+            )
+        ];
+
+        for call in calls.into_iter() {
+            assert_eq!(analyze_callsign(call.0), Err(call.1));
+        }
+    }
+
+    #[test]
+    fn invalid_homecall() {
+        let calls = [
+            (
+                "DL10000A",
+                CallsignError::NoHomeCall,
+            ),
+            (
+                "W1AW/DA1BC",
+                CallsignError::MultipleHomeCalls,
+            ),
+            (
+                "W1AW/P/DA1BC",
+                CallsignError::MultipleHomeCalls,
+            ),
+            (
+                "W1AW/P/DA1BC/LH",
+                CallsignError::MultipleHomeCalls,
+            ),
+            (
+                "W1AW/P/DA1BC/LH/P",
+                CallsignError::MultipleHomeCalls,
+            ),
+            (
+                "1A/W1AW/P/DA1BC/LH/P",
+                CallsignError::MultipleHomeCalls,
+            )
+        ];
+
+        for call in calls.into_iter() {
+            assert_eq!(analyze_callsign(call.0), Err(call.1));
+        }
+    }
+
+    #[test]
+    fn invalid_prefix() {
+        let calls = [
+            (
+                "EA/OE/DA1BC",
+                CallsignError::MultipleAdditionalPrefixes,
+            ),
+            (
+                "EA/OE/DA1BC/P",
+                CallsignError::MultipleAdditionalPrefixes,
+            )
+        ];
+
+        for call in calls.into_iter() {
+            assert_eq!(analyze_callsign(call.0), Err(call.1));
+        }
     }
 }
