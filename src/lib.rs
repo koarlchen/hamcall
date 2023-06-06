@@ -27,7 +27,7 @@ impl Callsign {
             String::new()
         };
 
-        let str_suffix = if self.add_suffix.len() > 0 {
+        let str_suffix = if !self.add_suffix.is_empty() {
             format!("/{}", self.add_suffix.join("/"))
         } else {
             String::new()
@@ -86,12 +86,12 @@ pub fn analyze_callsign(call: &str) -> Result<Callsign, CallsignError> {
     }
 
     // Split raw callsign into its parts
-    let splits: Vec<&str> = call.split("/").collect();
+    let splits: Vec<&str> = call.split('/').collect();
 
     // Extract all valid home calls from splits
     let homecalls: Vec<(String, String, String, String)> = splits
         .iter()
-        .map(|&part| {
+        .filter_map(|&part| {
             if let Some(caps) = RE_HOME_CALL.captures(part) {
                 let offset = if caps.get(1).is_some() { 1 } else { 5 };
                 Some((
@@ -104,8 +104,6 @@ pub fn analyze_callsign(call: &str) -> Result<Callsign, CallsignError> {
                 None
             }
         })
-        .filter(|part| part.is_some())
-        .map(|part| part.unwrap())
         .collect();
 
     // Check for number of found results
@@ -135,11 +133,11 @@ pub fn analyze_callsign(call: &str) -> Result<Callsign, CallsignError> {
         prefix: homecall.1.clone(),
         number: homecall.2.clone(),
         suffix: homecall.3.clone(),
-        add_prefix: add_prefix,
+        add_prefix,
         add_suffix: splits
             .into_iter()
             .skip(call_offset + 1)
-            .map(|val| String::from(val))
+            .map(String::from)
             .collect(),
     };
 
