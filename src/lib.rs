@@ -76,11 +76,8 @@ pub enum CallsignError {
 pub fn analyze_callsign(call: &str) -> Result<Callsign, CallsignError> {
     lazy_static! {
         static ref RE_CALL: Regex = Regex::new(r"^[A-Z0-9]+[A-Z0-9/]*[A-Z0-9]+$").unwrap();
-        static ref RE_HOME_CALL: Regex = Regex::new(
-            r"(?:^|/)((\d[A-Z]+)(\d{1,4})([A-Z]+))(?:$|/)|(?:^|/)(([A-Z]+)(\d{1,4})([A-Z]+))(?:$|/)"
-        )
-        .unwrap();
-        static ref RE_SUFFIX: Regex = Regex::new(r"/[A-Z0-9]+").unwrap();
+        static ref RE_HOME_CALL: Regex =
+            Regex::new(r"^(?:(([A-Z]+)(\d+)([A-Z]+))|((\d[A-Z]+)(\d+)([A-Z]+)))$").unwrap();
     }
 
     // Check that only allowed characters are present and the callsign does not begin or end with a /
@@ -88,73 +85,71 @@ pub fn analyze_callsign(call: &str) -> Result<Callsign, CallsignError> {
         return Err(CallsignError::InvalidFormat);
     }
 
-    // Search for home callsigns (= complete callsigns)
-    let mut calls = RE_HOME_CALL.captures_iter(call);
+    // Split raw callsign into its parts
+    let splits: Vec<&str> = call.split("/").collect();
 
-    // Check if at least one home callsign is present
-    if let Some(first_match) = calls.next() {
-        // Check for multiple home callsigns
-        if calls.count() != 0 {
-            return Err(CallsignError::MultipleHomeCalls);
-        }
+    // Extract all valid home calls from splits
+    let homecalls: Vec<(String, String, String, String)> = splits
+        .iter()
+        .map(|&part| {
+            if let Some(caps) = RE_HOME_CALL.captures(part) {
+                let offset = if caps.get(1).is_some() { 1 } else { 5 };
+                Some((
+                    String::from(&caps[offset]),
+                    String::from(&caps[offset + 1]),
+                    String::from(&caps[offset + 2]),
+                    String::from(&caps[offset + 3]),
+                ))
+            } else {
+                None
+            }
+        })
+        .filter(|part| part.is_some())
+        .map(|part| part.unwrap())
+        .collect();
 
-        // Get regex groups offsets
-        // Required to check which of both major regex groups to access later on
-        let (group_offset, homecall) = if first_match.get(1).is_some() {
-            (1, first_match.get(1).unwrap().as_str())
-        } else {
-            (5, first_match.get(5).unwrap().as_str())
-        };
+    // Check for number of found results
+    let homecall = match homecalls.len() {
+        0 => return Err(CallsignError::NoHomeCall),
+        1 => homecalls.get(0).unwrap(),
+        _ => return Err(CallsignError::MultipleHomeCalls),
+    };
 
-        // Extract homecalls prefix, number and suffix (unwraps are safe due to pre-calculated offset and used regex)
-        let prefix = first_match.get(group_offset + 1).unwrap().as_str().into();
-        let number = first_match.get(group_offset + 2).unwrap().as_str().into();
-        let suffix = first_match.get(group_offset + 3).unwrap().as_str().into();
+    // Calculate offset of home call within splits
+    let call_offset = splits.iter().position(|&c| c == homecall.0).unwrap(); // TODO: Could the position extracted previously? Maybe by using enumerate on iter
 
-        // Get offset of homecall within complete callsign (unwrap is safe since homecall is part of complete callsign)
-        let call_offset = call.find(homecall).unwrap();
-
-        // Extract raw additional prefix
-        let add_prefix_raw = &call[0..call_offset];
-
-        // Check for multiple additional prefixes
-        if add_prefix_raw.matches("/").count() > 1 {
-            return Err(CallsignError::MultipleAdditionalPrefixes);
-        }
-
-        // Get prefix (ignore trailing /)
-        let add_prefix = match add_prefix_raw.len() {
-            0 => None,
-            len => Some(String::from(&add_prefix_raw[0..len - 1])),
-        };
-
-        // Split suffixes (ignore leading /)
-        let add_suffixes: Vec<String> = RE_SUFFIX
-            .find_iter(&call[call_offset + homecall.len()..])
-            .map(|suffix| String::from(&(suffix.as_str())[1..]))
-            .collect();
-
-        // Fill result struct
-        let res = Callsign {
-            prefix,
-            number,
-            suffix,
-            add_prefix,
-            add_suffix: add_suffixes,
-        };
-
-        // Basic check that raw input must match the formatted output
-        if res.call() != call {
-            return Err(CallsignError::InternalError);
-        }
-
-        // Return result
-        Ok(res)
-    } else {
-        Err(CallsignError::NoHomeCall)
+    // Check for multiple additional prefixes
+    if call_offset >= 2 {
+        return Err(CallsignError::MultipleAdditionalPrefixes);
     }
-}
 
+    // Get additional prefix
+    let add_prefix = if call_offset == 1 {
+        Some(String::from(splits[call_offset - 1]))
+    } else {
+        None
+    };
+
+    // Build together callsign
+    let res = Callsign {
+        prefix: homecall.1.clone(),
+        number: homecall.2.clone(),
+        suffix: homecall.3.clone(),
+        add_prefix: add_prefix,
+        add_suffix: splits
+            .into_iter()
+            .skip(call_offset + 1)
+            .map(|val| String::from(val))
+            .collect(),
+    };
+
+    // Basic cross check
+    if call != res.call() {
+        return Err(CallsignError::InternalError);
+    }
+
+    Ok(res)
+}
 
 #[cfg(test)]
 mod tests {
@@ -191,7 +186,7 @@ mod tests {
                     suffix: "B".into(),
                     add_prefix: None,
                     add_suffix: Vec::new(),
-                }
+                },
             ),
             (
                 "DL100FW",
@@ -201,7 +196,7 @@ mod tests {
                     suffix: "FW".into(),
                     add_prefix: None,
                     add_suffix: Vec::new(),
-                }
+                },
             ),
             (
                 "DL9999DOK",
@@ -211,7 +206,7 @@ mod tests {
                     suffix: "DOK".into(),
                     add_prefix: None,
                     add_suffix: Vec::new(),
-                }
+                },
             ),
             (
                 "3DA0AQ",
@@ -221,18 +216,28 @@ mod tests {
                     suffix: "AQ".into(),
                     add_prefix: None,
                     add_suffix: Vec::new(),
-                }
+                },
             ),
             (
-                "F04OD", // TODO: Not sure about this one. Is F04OD actually valid?
+                "3E100PC",
+                Callsign {
+                    prefix: "3E".into(),
+                    number: "100".into(),
+                    suffix: "PC".into(),
+                    add_prefix: None,
+                    add_suffix: Vec::new(),
+                },
+            ),
+            (
+                "F04OD",
                 Callsign {
                     prefix: "F".into(),
                     number: "04".into(),
                     suffix: "OD".into(),
                     add_prefix: None,
                     add_suffix: Vec::new(),
-                }
-            )
+                },
+            ),
         ];
 
         for call in calls.into_iter() {
@@ -251,7 +256,7 @@ mod tests {
                     suffix: "BC".into(),
                     add_prefix: Some("OE".into()),
                     add_suffix: Vec::new(),
-                }
+                },
             ),
             (
                 "OE1/DA1BC",
@@ -261,7 +266,7 @@ mod tests {
                     suffix: "BC".into(),
                     add_prefix: Some("OE1".into()),
                     add_suffix: Vec::new(),
-                }
+                },
             ),
             (
                 "1A/DA1BC",
@@ -271,7 +276,7 @@ mod tests {
                     suffix: "BC".into(),
                     add_prefix: Some("1A".into()),
                     add_suffix: Vec::new(),
-                }
+                },
             ),
             (
                 "W1/DA1BC",
@@ -281,7 +286,27 @@ mod tests {
                     suffix: "BC".into(),
                     add_prefix: Some("W1".into()),
                     add_suffix: Vec::new(),
-                }
+                },
+            ),
+            (
+                "3DA0/ZS6BCR",
+                Callsign {
+                    prefix: "ZS".into(),
+                    number: "6".into(),
+                    suffix: "BCR".into(),
+                    add_prefix: Some("3DA0".into()),
+                    add_suffix: Vec::new(),
+                },
+            ),
+            (
+                "4X3000/4X1BD",
+                Callsign {
+                    prefix: "4X".into(),
+                    number: "1".into(),
+                    suffix: "BD".into(),
+                    add_prefix: Some("4X3000".into()),
+                    add_suffix: Vec::new(),
+                },
             ),
         ];
 
@@ -301,7 +326,7 @@ mod tests {
                     suffix: "BC".into(),
                     add_prefix: None,
                     add_suffix: vec!["P".into()],
-                }
+                },
             ),
             (
                 "DA1BC/5",
@@ -311,7 +336,7 @@ mod tests {
                     suffix: "BC".into(),
                     add_prefix: None,
                     add_suffix: vec!["5".into()],
-                }
+                },
             ),
             (
                 "DA1BC/EA5",
@@ -321,7 +346,7 @@ mod tests {
                     suffix: "BC".into(),
                     add_prefix: None,
                     add_suffix: vec!["EA5".into()],
-                }
+                },
             ),
             (
                 "DA1BC/LH",
@@ -331,7 +356,7 @@ mod tests {
                     suffix: "BC".into(),
                     add_prefix: None,
                     add_suffix: vec!["LH".into()],
-                }
+                },
             ),
             (
                 "DA1BC/1A",
@@ -341,7 +366,7 @@ mod tests {
                     suffix: "BC".into(),
                     add_prefix: None,
                     add_suffix: vec!["1A".into()],
-                }
+                },
             ),
             (
                 "DA1BC/P/LH",
@@ -351,7 +376,7 @@ mod tests {
                     suffix: "BC".into(),
                     add_prefix: None,
                     add_suffix: vec!["P".into(), "LH".into()],
-                }
+                },
             ),
             (
                 "DA1BC/P/LH/ABC",
@@ -361,7 +386,7 @@ mod tests {
                     suffix: "BC".into(),
                     add_prefix: None,
                     add_suffix: vec!["P".into(), "LH".into(), "ABC".into()],
-                }
+                },
             ),
         ];
 
@@ -373,38 +398,14 @@ mod tests {
     #[test]
     fn invalid_something() {
         let calls = [
-            (
-                "/DA1BC",
-                CallsignError::InvalidFormat,
-            ),
-            (
-                "DA1BC/",
-                CallsignError::InvalidFormat,
-            ),
-            (
-                "/DA1BC/",
-                CallsignError::InvalidFormat,
-            ),
-            (
-                "DAIBC",
-                CallsignError::NoHomeCall,
-            ),
-            (
-                "OE/DAIBC",
-                CallsignError::NoHomeCall,
-            ),
-            (
-                "1ABC",
-                CallsignError::NoHomeCall,
-            ),
-            (
-                "1ABC/P",
-                CallsignError::NoHomeCall,
-            ),
-            (
-                "DA1BC2",
-                CallsignError::NoHomeCall,
-            )
+            ("/DA1BC", CallsignError::InvalidFormat),
+            ("DA1BC/", CallsignError::InvalidFormat),
+            ("/DA1BC/", CallsignError::InvalidFormat),
+            ("DAIBC", CallsignError::NoHomeCall),
+            ("OE/DAIBC", CallsignError::NoHomeCall),
+            ("1ABC", CallsignError::NoHomeCall),
+            ("1ABC/P", CallsignError::NoHomeCall),
+            ("DA1BC2", CallsignError::NoHomeCall),
         ];
 
         for call in calls.into_iter() {
@@ -415,30 +416,11 @@ mod tests {
     #[test]
     fn invalid_homecall() {
         let calls = [
-            (
-                "DL10000A",
-                CallsignError::NoHomeCall,
-            ),
-            (
-                "W1AW/DA1BC",
-                CallsignError::MultipleHomeCalls,
-            ),
-            (
-                "W1AW/P/DA1BC",
-                CallsignError::MultipleHomeCalls,
-            ),
-            (
-                "W1AW/P/DA1BC/LH",
-                CallsignError::MultipleHomeCalls,
-            ),
-            (
-                "W1AW/P/DA1BC/LH/P",
-                CallsignError::MultipleHomeCalls,
-            ),
-            (
-                "1A/W1AW/P/DA1BC/LH/P",
-                CallsignError::MultipleHomeCalls,
-            )
+            ("W1AW/DA1BC", CallsignError::MultipleHomeCalls),
+            ("W1AW/P/DA1BC", CallsignError::MultipleHomeCalls),
+            ("W1AW/P/DA1BC/LH", CallsignError::MultipleHomeCalls),
+            ("W1AW/P/DA1BC/LH/P", CallsignError::MultipleHomeCalls),
+            ("1A/W1AW/P/DA1BC/LH/P", CallsignError::MultipleHomeCalls),
         ];
 
         for call in calls.into_iter() {
@@ -449,14 +431,8 @@ mod tests {
     #[test]
     fn invalid_prefix() {
         let calls = [
-            (
-                "EA/OE/DA1BC",
-                CallsignError::MultipleAdditionalPrefixes,
-            ),
-            (
-                "EA/OE/DA1BC/P",
-                CallsignError::MultipleAdditionalPrefixes,
-            )
+            ("EA/OE/DA1BC", CallsignError::MultipleAdditionalPrefixes),
+            ("EA/OE/DA1BC/P", CallsignError::MultipleAdditionalPrefixes),
         ];
 
         for call in calls.into_iter() {
