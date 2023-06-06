@@ -123,7 +123,7 @@ pub fn analyze_callsign(call: &str) -> Result<Callsign, CallsignError> {
 
     // Get additional prefix
     let add_prefix = if call_offset == 1 {
-        Some(String::from(splits[call_offset - 1]))
+        Some(String::from(splits[0]))
     } else {
         None
     };
