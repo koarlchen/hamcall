@@ -7,3 +7,5 @@ edition = "2021"
 regex = "1.8.3"
 lazy_static = "1.4.0"
 thiserror = "1.0.40"
+serde = { version = "1.0.164", features = ["derive"] }
+quick-xml = { version = "0.28.2", features = ["serialize"] }

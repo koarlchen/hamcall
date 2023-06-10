@@ -3,6 +3,8 @@ use regex::Regex;
 use std::vec::Vec;
 use thiserror::Error;
 
+pub mod clublog;
+
 /// Callsign
 #[derive(Debug, PartialEq, Eq)]
 pub struct Callsign {
