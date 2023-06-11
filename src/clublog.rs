@@ -1,5 +1,6 @@
+use chrono::{DateTime, FixedOffset};
+use serde::{Deserialize, Deserializer};
 use std::vec::Vec;
-use serde::Deserialize;
 
 #[derive(Debug)]
 pub struct Error;
@@ -8,11 +9,32 @@ pub fn parse(content: &str) -> Result<Clublog, Error> {
     quick_xml::de::from_str(content).map_err(|_| Error)
 }
 
+fn parse_datetime<'de, D>(deserializer: D) -> Result<DateTime<FixedOffset>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    DateTime::parse_from_rfc3339(&s).map_err(serde::de::Error::custom)
+}
+
+fn parse_datetime_opt<'de, D>(deserializer: D) -> Result<Option<DateTime<FixedOffset>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+
+    Ok(Some(
+        DateTime::parse_from_rfc3339(&s).map_err(serde::de::Error::custom)?,
+    ))
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename = "clublog")]
 pub struct Clublog {
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime")]
     #[serde(rename = "@date")]
-    pub date: String, // actually datetime
+    pub date: DateTime<FixedOffset>,
     #[serde(rename = "@xmlns")]
     pub xmlns: String,
     pub entities: Entities,
@@ -37,8 +59,12 @@ pub struct Entity {
     pub cont: String,
     pub long: f32,
     pub lat: f32,
-    pub start: Option<String>, // TODO: actually datetime
-    pub end: Option<String>, // TODO: actually datetime
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime_opt")]
+    pub start: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime_opt")]
+    pub end: Option<DateTime<FixedOffset>>,
     pub whitelist: Option<bool>,
     pub whitelist_start: Option<String>,
 }
@@ -59,8 +85,12 @@ pub struct Exception {
     pub cont: String,
     pub long: f32,
     pub lat: f32,
-    pub start: Option<String>, // TODO: actually datetime
-    pub end: Option<String>, // TODO: actually datetime
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime_opt")]
+    pub start: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime_opt")]
+    pub end: Option<DateTime<FixedOffset>>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -74,13 +104,17 @@ pub struct Prefix {
     pub record: u16,
     pub call: String,
     pub entity: String,
-    pub adif: Option<u16>, // FIXME: acc. to xsd no option required
-    pub cqz: Option<u8>, // FIXME: acc. to xsd no option required
+    pub adif: Option<u16>,    // FIXME: acc. to xsd no option required
+    pub cqz: Option<u8>,      // FIXME: acc. to xsd no option required
     pub cont: Option<String>, // FIXME: acc. to xsd no option required
-    pub long: Option<f32>, // FIXME: acc. to xsd no option required
-    pub lat: Option<f32>, // FIXME: acc. to xsd no option required
-    pub start: Option<String>, // TODO: actually datetime
-    pub end: Option<String>, // TOOO: actually datetime
+    pub long: Option<f32>,    // FIXME: acc. to xsd no option required
+    pub lat: Option<f32>,     // FIXME: acc. to xsd no option required
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime_opt")]
+    pub start: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime_opt")]
+    pub end: Option<DateTime<FixedOffset>>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -93,8 +127,12 @@ pub struct Invalid {
     #[serde(rename = "@record")]
     pub record: u16,
     pub call: String,
-    pub start: Option<String>, // TODO: actually datetime
-    pub end: Option<String>, // TODO: actually datetime
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime_opt")]
+    pub start: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime_opt")]
+    pub end: Option<DateTime<FixedOffset>>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -108,6 +146,10 @@ pub struct ZoneException {
     pub record: u16,
     pub call: String,
     pub zone: u8,
-    pub start: Option<String>, // TODO: actually datetime
-    pub end: Option<String>, // TODO: actually datetime
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime_opt")]
+    pub start: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime_opt")]
+    pub end: Option<DateTime<FixedOffset>>,
 }
