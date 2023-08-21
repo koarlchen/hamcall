@@ -31,6 +31,7 @@ impl ClubLog {
             .entity
             .iter()
             .find(|e| e.adif == pref.adif.unwrap())?; // FIXME: Thats possible an internal error since all adif identifiers mentioned within a prefix should be present within the entities list
+                                                      // TODO: Find returns only the first match. Is this a possible error here?
 
         // Return result
         Some(entity.into())
@@ -47,6 +48,7 @@ impl ClubLog {
             .exception
             .iter()
             .find(|e| e.call == callsign)
+        // TODO: Find returns only the first match. Is this a possible error here?
         {
             if match (exception.start, exception.end) {
                 (Some(tstart), Some(tend)) => timestamp >= tstart && timestamp <= tend,
@@ -70,6 +72,7 @@ impl ClubLog {
             .invalid
             .iter()
             .find(|o| o.call == callsign)
+        // TODO: Find returns only the first match. Is this a possible error here?
         {
             match (operation.start, operation.end) {
                 (Some(tstart), Some(tend)) => timestamp >= tstart && timestamp <= tend,
@@ -93,6 +96,7 @@ impl ClubLog {
             .zone_exception
             .iter()
             .find(|o| o.call == callsign)
+        // TODO: Find returns only the first match. Is this a possible error here?
         {
             if match (exception.start, exception.end) {
                 (Some(tstart), Some(tend)) => timestamp >= tstart && timestamp <= tend,
@@ -298,7 +302,15 @@ struct Prefixes {
     pub prefix: Vec<Prefix>,
 }
 
-/// Single callsign prefix
+/// Single callsign prefix.
+///
+/// Each prefix is representated by a single entry.
+/// For example the prefixes `DA` and `DB` do both refer to the same DXCC `FEDERAL REPUBLIC OF GERMANY`.
+/// Even all other fields of the two entries feature the same data.
+/// While searching for prefixes make sure to also validate against the optional [start](Prefix::start) and [end](Prefix::end) timestamps.
+///
+/// If the fields [adif](Prefix::adif), [cqz](Prefix::cqz), [cont](Prefix::cont), [long](Prefix::long) and [lat](Prefix::lat) are `None`
+/// the [entity](Prefix::entity) field may be `INVALID` or `MARITIME MOBILE`.
 #[derive(Debug, Deserialize, PartialEq)]
 struct Prefix {
     /// Identifier
