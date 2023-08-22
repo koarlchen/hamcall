@@ -1,4 +1,5 @@
-//! Parser for the club log xml based country information.
+//! Parser for the club log xml based country and callsign information.
+//! Provides a few basic methods to query information out of the data.
 
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Deserializer};
@@ -203,22 +204,22 @@ pub struct ClubLog {
     pub date: DateTime<FixedOffset>,
     /// XML namespace
     #[serde(rename = "@xmlns")]
-    _xmlns: String,
+    pub xmlns: String,
     /// List of entities
-    entities: Entities,
+    pub entities: Entities,
     /// List of exceptions
-    exceptions: CallsignExceptions,
+    pub exceptions: CallsignExceptions,
     /// List of prefixes
-    prefixes: Prefixes,
+    pub prefixes: Prefixes,
     /// List of invalid operations
-    invalid_operations: InvalidOperations,
+    pub invalid_operations: InvalidOperations,
     /// List of CQ zone exceptions
-    zone_exceptions: ZoneExceptions,
+    pub zone_exceptions: ZoneExceptions,
 }
 
 /// List of entities / DXCCs
 #[derive(Debug, Deserialize, PartialEq)]
-struct Entities {
+pub struct Entities {
     #[serde(rename = "entity")]
     pub list: Vec<Entity>,
 }
@@ -239,7 +240,7 @@ struct Entities {
 /// May also check the field [whitelist_start](Entity::whitelist_start) after which contacts shall be checked against the whitelist.
 /// The timstamp is not necessarily present if a entity is whitelisted.
 #[derive(Debug, Deserialize, PartialEq)]
-struct Entity {
+pub struct Entity {
     /// ADIF identifier
     pub adif: u16,
     /// Name
@@ -273,7 +274,7 @@ struct Entity {
 /// List of callsign exceptions
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename = "Exceptions")]
-struct CallsignExceptions {
+pub struct CallsignExceptions {
     #[serde(rename = "exception")]
     pub list: Vec<CallsignException>,
 }
@@ -289,7 +290,7 @@ struct CallsignExceptions {
 /// Valid callsigns for a [whitelisted entity](Entity::whitelist) are also part of the callsign exception list.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename = "Exception")]
-struct CallsignException {
+pub struct CallsignException {
     /// Identifier
     #[serde(rename = "@record")]
     pub record: u16,
@@ -319,7 +320,7 @@ struct CallsignException {
 
 /// List of callsign prefixes
 #[derive(Debug, Deserialize, PartialEq)]
-struct Prefixes {
+pub struct Prefixes {
     #[serde(rename = "prefix")]
     pub list: Vec<Prefix>,
 }
@@ -334,7 +335,7 @@ struct Prefixes {
 /// If the fields [adif](Prefix::adif), [cqz](Prefix::cqz), [cont](Prefix::cont), [long](Prefix::long) and [lat](Prefix::lat) are `None`
 /// the [entity](Prefix::entity) field may be `INVALID` or `MARITIME MOBILE`.
 #[derive(Debug, Deserialize, PartialEq)]
-struct Prefix {
+pub struct Prefix {
     /// Identifier
     #[serde(rename = "@record")]
     pub record: u16,
@@ -364,7 +365,7 @@ struct Prefix {
 
 /// List of invalid operations
 #[derive(Debug, Deserialize, PartialEq)]
-struct InvalidOperations {
+pub struct InvalidOperations {
     #[serde(rename = "invalid")]
     pub list: Vec<InvalidOperation>,
 }
@@ -376,7 +377,7 @@ struct InvalidOperations {
 /// Furthermore, check the validity against the optional [start](InvalidOperation::start) and [end](InvalidOperation::end) timestamps.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename = "Invalid")]
-struct InvalidOperation {
+pub struct InvalidOperation {
     /// Identifier
     #[serde(rename = "@record")]
     pub record: u16,
@@ -394,7 +395,7 @@ struct InvalidOperation {
 
 /// List of CQ zone exceptions
 #[derive(Debug, Deserialize, PartialEq)]
-struct ZoneExceptions {
+pub struct ZoneExceptions {
     #[serde(rename = "zone_exception")]
     pub list: Vec<ZoneException>,
 }
@@ -405,7 +406,7 @@ struct ZoneExceptions {
 /// When searching for a matching entry the [callsign](ZoneException::call) must match exactly including prefix and suffix.
 /// Furthermore, check the validity against the optional [start](ZoneException::start) and [end](ZoneException::end) timestamps.
 #[derive(Debug, Deserialize, PartialEq)]
-struct ZoneException {
+pub struct ZoneException {
     /// Identifier
     #[serde(rename = "@record")]
     pub record: u16,
@@ -431,6 +432,19 @@ mod tests {
     fn read_clublog_xml() -> ClubLog {
         let raw = fs::read_to_string("data/clublog/cty.xml").unwrap();
         ClubLog::parse(&raw).unwrap()
+    }
+
+    #[test]
+    fn check_parser() {
+        let clublog = read_clublog_xml();
+
+        assert!(!clublog.xmlns.is_empty());
+
+        assert!(clublog.entities.list.len() > 0);
+        assert!(clublog.exceptions.list.len() > 0);
+        assert!(clublog.prefixes.list.len() > 0);
+        assert!(clublog.invalid_operations.list.len() > 0);
+        assert!(clublog.zone_exceptions.list.len() > 0);
     }
 
     #[test]
