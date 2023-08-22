@@ -400,7 +400,7 @@ struct ZoneExceptions {
 /// 
 /// An entry represents a callsign, where the CQ zone of the entity is different.
 /// When searching for a matching entry the [callsign](ZoneException::call) must match exactly including prefix and suffix.
-/// Furthermore, check the validity against the optional [start](Invalid::start) and [end](Invalid::end) timestamps.
+/// Furthermore, check the validity against the optional [start](ZoneException::start) and [end](ZoneException::end) timestamps.
 #[derive(Debug, Deserialize, PartialEq)]
 struct ZoneException {
     /// Identifier
