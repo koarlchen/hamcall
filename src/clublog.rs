@@ -18,7 +18,7 @@ impl ClubLog {
     /// Query callsign information for prefix.
     pub fn lookup_prefix(&self, prefix: &str) -> Option<CallInfo> {
         // Search for matching prefix
-        let pref = self.prefixes.prefix.iter().find(|p| p.call == prefix)?;
+        let pref = self.prefixes.list.iter().find(|p| p.call == prefix)?;
 
         // Check wether an adif identifier is given
         if pref.adif.is_none() {
@@ -28,7 +28,7 @@ impl ClubLog {
         // Search entity for prefix
         let entity = self
             .entities
-            .entity
+            .list
             .iter()
             .find(|e| e.adif == pref.adif.unwrap())?; // FIXME: Thats possible an internal error since all adif identifiers mentioned within a prefix should be present within the entities list
                                                       // TODO: Find returns only the first match. Is this a possible error here?
@@ -43,11 +43,7 @@ impl ClubLog {
         callsign: &str,
         timestamp: DateTime<FixedOffset>,
     ) -> Option<CallInfo> {
-        if let Some(exception) = self
-            .exceptions
-            .exception
-            .iter()
-            .find(|e| e.call == callsign)
+        if let Some(exception) = self.exceptions.list.iter().find(|e| e.call == callsign)
         // TODO: Find returns only the first match. Is this a possible error here?
         {
             if match (exception.start, exception.end) {
@@ -69,7 +65,7 @@ impl ClubLog {
     pub fn is_invalid_operation(&self, callsign: &str, timestamp: DateTime<FixedOffset>) -> bool {
         if let Some(operation) = self
             .invalid_operations
-            .invalid
+            .list
             .iter()
             .find(|o| o.call == callsign)
         // TODO: Find returns only the first match. Is this a possible error here?
@@ -93,7 +89,7 @@ impl ClubLog {
     ) -> Option<u8> {
         if let Some(exception) = self
             .zone_exceptions
-            .zone_exception
+            .list
             .iter()
             .find(|o| o.call == callsign)
         // TODO: Find returns only the first match. Is this a possible error here?
@@ -161,8 +157,8 @@ impl From<&Prefix> for CallInfo {
     }
 }
 
-impl From<&Exception> for CallInfo {
-    fn from(exception: &Exception) -> Self {
+impl From<&CallsignException> for CallInfo {
+    fn from(exception: &CallsignException) -> Self {
         Self {
             country: exception.entity.clone(),
             prefix: exception.call.clone(), // TODO: prefix != callsign, maybe generic CallInfo not required. Use specific type instead
@@ -211,7 +207,7 @@ pub struct ClubLog {
     /// List of entities
     entities: Entities,
     /// List of exceptions
-    exceptions: Exceptions,
+    exceptions: CallsignExceptions,
     /// List of prefixes
     prefixes: Prefixes,
     /// List of invalid operations
@@ -223,7 +219,8 @@ pub struct ClubLog {
 /// List of entities / DXCCs
 #[derive(Debug, Deserialize, PartialEq)]
 struct Entities {
-    pub entity: Vec<Entity>,
+    #[serde(rename = "entity")]
+    pub list: Vec<Entity>,
 }
 
 /// Single entity / DXCC.
@@ -238,7 +235,7 @@ struct Entities {
 ///
 /// If the field [whitelist](Entity::whitelist) is set to `true`, the entity is probably on the most wanted DXCC list.
 /// Therefore only approved callsigns shall be logged for that entity.
-/// The list of approved callsigns is part of the [callsign exception](Exception) list.
+/// The list of approved callsigns is part of the [callsign exception](CallsignException) list.
 /// May also check the field [whitelist_start](Entity::whitelist_start) after which contacts shall be checked against the whitelist.
 /// The timstamp is not necessarily present if a entity is whitelisted.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -276,21 +273,24 @@ struct Entity {
 
 /// List of callsign exceptions
 #[derive(Debug, Deserialize, PartialEq)]
-struct Exceptions {
-    pub exception: Vec<Exception>,
+#[serde(rename = "Exceptions")]
+struct CallsignExceptions {
+    #[serde(rename = "exception")]
+    pub list: Vec<CallsignException>,
 }
 
 /// Callsign exception.
 ///
 /// Represents an exceptions to a callsign [prefix](Prefix).
-/// When searching for a matching entry the [callsign](Exception::call) must match exactly including prefix and suffix.
-/// 
-/// An entry may indicate a different value for the fields [adif](Exception::adif), [cqz](Exception::cqz), [cont](Exception::cont), [cont](Exception::cont), [lat](Exception::lat) or [lat](Exception::long) compared to the values of the matching [prefix](Prefix) entry.
-/// While searching through the list of exceptions make sure to also validate against the optional [start](Exception::start) and [end](Exception::end) timestamps.
+/// When searching for a matching entry the [callsign](CallsignException::call) must match exactly including prefix and suffix.
+///
+/// An entry may indicate a different value for the fields [adif](CallsignException::adif), [cqz](CallsignException::cqz), [cont](CallsignException::cont), [cont](CallsignException::cont), [lat](CallsignException::lat) or [lat](CallsignException::long) compared to the values of the matching [prefix](Prefix) entry.
+/// While searching through the list of exceptions make sure to also validate against the optional [start](CallsignException::start) and [end](CallsignException::end) timestamps.
 ///
 /// Valid callsigns for a [whitelisted entity](Entity::whitelist) are also part of the callsign exception list.
 #[derive(Debug, Deserialize, PartialEq)]
-struct Exception {
+#[serde(rename = "Exception")]
+struct CallsignException {
     /// Identifier
     #[serde(rename = "@record")]
     pub record: u16,
@@ -321,7 +321,8 @@ struct Exception {
 /// List of callsign prefixes
 #[derive(Debug, Deserialize, PartialEq)]
 struct Prefixes {
-    pub prefix: Vec<Prefix>,
+    #[serde(rename = "prefix")]
+    pub list: Vec<Prefix>,
 }
 
 /// Callsign prefix.
@@ -365,16 +366,18 @@ struct Prefix {
 /// List of invalid operations
 #[derive(Debug, Deserialize, PartialEq)]
 struct InvalidOperations {
-    pub invalid: Vec<Invalid>,
+    #[serde(rename = "invalid")]
+    pub list: Vec<InvalidOperation>,
 }
 
 /// Invalid operation.
-/// 
+///
 /// An entry represents an invalid operation.
-/// When searching for a matching entry the [callsign](Invalid::call) must match exactly including prefix and suffix.
-/// Furthermore, check the validity against the optional [start](Invalid::start) and [end](Invalid::end) timestamps.
+/// When searching for a matching entry the [callsign](InvalidOperation::call) must match exactly including prefix and suffix.
+/// Furthermore, check the validity against the optional [start](InvalidOperation::start) and [end](InvalidOperation::end) timestamps.
 #[derive(Debug, Deserialize, PartialEq)]
-struct Invalid {
+#[serde(rename = "Invalid")]
+struct InvalidOperation {
     /// Identifier
     #[serde(rename = "@record")]
     pub record: u16,
@@ -393,11 +396,12 @@ struct Invalid {
 /// List of CQ zone exceptions
 #[derive(Debug, Deserialize, PartialEq)]
 struct ZoneExceptions {
-    pub zone_exception: Vec<ZoneException>,
+    #[serde(rename = "zone_exception")]
+    pub list: Vec<ZoneException>,
 }
 
 /// CQ zone exception.
-/// 
+///
 /// An entry represents a callsign, where the CQ zone of the entity is different.
 /// When searching for a matching entry the [callsign](ZoneException::call) must match exactly including prefix and suffix.
 /// Furthermore, check the validity against the optional [start](ZoneException::start) and [end](ZoneException::end) timestamps.
