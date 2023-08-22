@@ -267,7 +267,6 @@ struct Entity {
     /// True if only a whitelist of callsigns are valid for this entity
     pub whitelist: Option<bool>,
     /// Timestamp afer which the whitelist shall be used
-    /// TODO: assumption that the actual whitelist is part of the exception list
     pub whitelist_start: Option<String>,
 }
 
