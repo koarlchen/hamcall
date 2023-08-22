@@ -368,7 +368,11 @@ struct InvalidOperations {
     pub invalid: Vec<Invalid>,
 }
 
-/// Single invalid operation
+/// Invalid operation.
+/// 
+/// An entry represents an invalid operation.
+/// When searching for a matching entry the [callsign](Invalid::call) must match exactly including prefix and suffix.
+/// Furthermore, check the validity against the optional [start](Invalid::start) and [end](Invalid::end) timestamps.
 #[derive(Debug, Deserialize, PartialEq)]
 struct Invalid {
     /// Identifier
