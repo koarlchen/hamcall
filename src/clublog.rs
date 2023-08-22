@@ -226,7 +226,21 @@ struct Entities {
     pub entity: Vec<Entity>,
 }
 
-/// Single entity / DXCC
+/// Single entity / DXCC.
+///
+/// An entry represents a single entity or rather DXCC.
+/// The field [prefix](Entity::prefix) contains the main prefix of that entity.
+/// All other prefixes including the main one are part of the [prefixes](Prefix) list.
+/// Make sure to also validate against the [start](Prefix::start) and [end](Prefix::end) timestamps.
+///
+/// The field [deleted](Entity::deleted) may indicate a time limited validity of that entity.
+/// Check the field [end](Entity::end) on the last timestamp a contact with that entity was valid.
+///
+/// If the field [whitelist](Entity::whitelist) is set to `true`, the entity is probably on the most wanted DXCC list.
+/// Therefore only approved callsigns shall be logged for that entity.
+/// The list of approved callsigns is part of the [callsign exception](Exception) list.
+/// May also check the field [whitelist_start](Entity::whitelist_start) after which contacts shall be checked against the whitelist.
+/// The timstamp is not necessarily present if a entity is whitelisted.
 #[derive(Debug, Deserialize, PartialEq)]
 struct Entity {
     /// ADIF identifier
@@ -235,7 +249,7 @@ struct Entity {
     pub name: String,
     /// Main callsign prefix
     pub prefix: String,
-    /// Entity deleted after [end](`Entity::end`)
+    /// Entity deleted after [end](Entity::end)
     pub deleted: bool,
     /// CQ zone
     pub cqz: u8,
