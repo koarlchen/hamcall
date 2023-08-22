@@ -396,7 +396,11 @@ struct ZoneExceptions {
     pub zone_exception: Vec<ZoneException>,
 }
 
-/// Single CQ zone exception
+/// CQ zone exception.
+/// 
+/// An entry represents a callsign, where the CQ zone of the entity is different.
+/// When searching for a matching entry the [callsign](ZoneException::call) must match exactly including prefix and suffix.
+/// Furthermore, check the validity against the optional [start](Invalid::start) and [end](Invalid::end) timestamps.
 #[derive(Debug, Deserialize, PartialEq)]
 struct ZoneException {
     /// Identifier
