@@ -266,7 +266,13 @@ struct Exceptions {
     pub exception: Vec<Exception>,
 }
 
-/// Single callsign exception
+/// Callsign exception.
+///
+/// Represents an exceptions to a callsign [prefix](Prefix).
+/// An entry may indicate a different value for the fields [adif](Exception::adif), [cqz](Exception::cqz), [cont](Exception::cont), [cont](Exception::cont), [lat](Exception::lat) or [lat](Exception::long) compared to the values of the matching [prefix](Prefix) entry.
+/// While searching through the list of exceptions make sure to also validate against the optional [start](Exception::start) and [end](Exception::end) timestamps.
+///
+/// Valid callsigns for a [whitelisted entity](Entity::whitelist) are also part of the callsign exception list.
 #[derive(Debug, Deserialize, PartialEq)]
 struct Exception {
     /// Identifier
@@ -302,12 +308,12 @@ struct Prefixes {
     pub prefix: Vec<Prefix>,
 }
 
-/// Single callsign prefix.
+/// Callsign prefix.
 ///
 /// Each prefix is representated by a single entry.
 /// For example the prefixes `DA` and `DB` do both refer to the same DXCC `FEDERAL REPUBLIC OF GERMANY`.
 /// Even all other fields of the two entries feature the same data.
-/// While searching for prefixes make sure to also validate against the optional [start](Prefix::start) and [end](Prefix::end) timestamps.
+/// While searching for a matching prefix make sure to also validate against the optional [start](Prefix::start) and [end](Prefix::end) timestamps.
 ///
 /// If the fields [adif](Prefix::adif), [cqz](Prefix::cqz), [cont](Prefix::cont), [long](Prefix::long) and [lat](Prefix::lat) are `None`
 /// the [entity](Prefix::entity) field may be `INVALID` or `MARITIME MOBILE`.
