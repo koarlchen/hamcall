@@ -283,6 +283,8 @@ struct Exceptions {
 /// Callsign exception.
 ///
 /// Represents an exceptions to a callsign [prefix](Prefix).
+/// When searching for a matching entry the [callsign](Exception::call) must match exactly including prefix and suffix.
+/// 
 /// An entry may indicate a different value for the fields [adif](Exception::adif), [cqz](Exception::cqz), [cont](Exception::cont), [cont](Exception::cont), [lat](Exception::lat) or [lat](Exception::long) compared to the values of the matching [prefix](Prefix) entry.
 /// While searching through the list of exceptions make sure to also validate against the optional [start](Exception::start) and [end](Exception::end) timestamps.
 ///
