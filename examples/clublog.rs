@@ -1,7 +1,7 @@
-use std::fs;
-use std::env;
 use callsign::clublog;
-
+use chrono::Utc;
+use std::env;
+use std::fs;
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
@@ -12,7 +12,8 @@ pub fn main() {
         let raw = fs::read_to_string(&args[1]).unwrap();
         let clublog = clublog::ClubLog::parse(&raw).unwrap();
 
-        let info = clublog.lookup_prefix(&args[2]).unwrap();
-        println!("CallInfo for {}:\n{:?}", args[2], info);
+        let info = clublog.get_prefix(&args[2], Utc::now().into()).unwrap();
+
+        println!("Information for {}:\n{:?}", args[2], info);
     }
 }

@@ -3,7 +3,6 @@
 
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Deserializer};
-use std::convert::From;
 use std::vec::Vec;
 
 /// Errors
@@ -16,47 +15,59 @@ impl ClubLog {
         quick_xml::de::from_str(content).map_err(|_| Error)
     }
 
-    /// Query callsign information for prefix.
-    pub fn lookup_prefix(&self, prefix: &str) -> Option<CallInfo> {
-        // Search for matching prefix
-        let pref = self.prefixes.list.iter().find(|p| p.call == prefix)?;
+    /// Get entity information by adif identifier.
+    pub fn get_entity(&self, adif: u16, timestamp: DateTime<FixedOffset>) -> Option<&Entity> {
+        let et = self.entities.list.iter().find(|e| e.adif == adif)?;
 
-        // Check wether an adif identifier is given
-        if pref.adif.is_none() {
-            return Some(pref.into());
+        if is_in_time_window(timestamp, et.start, et.end) {
+            Some(et)
+        } else {
+            None
         }
-
-        // Search entity for prefix
-        let entity = self
-            .entities
-            .list
-            .iter()
-            .find(|e| e.adif == pref.adif.unwrap())?; // FIXME: Thats possible an internal error since all adif identifiers mentioned within a prefix should be present within the entities list
-                                                      // TODO: Find returns only the first match. Is this a possible error here?
-
-        // Return result
-        Some(entity.into())
     }
 
-    /// Check if a exception exists for that specific callsign.
+    /// Get prefix information by callsign prefix.
+    pub fn get_prefix(&self, prefix: &str, timestamp: DateTime<FixedOffset>) -> Option<&Prefix> {
+        let pref = self.prefixes.list.iter().find(|p| p.call == prefix)?;
+
+        if is_in_time_window(timestamp, pref.start, pref.end) {
+            Some(pref)
+        } else {
+            None
+        }
+    }
+
+    /// Get callsign exception information by callsign.
     pub fn get_callsign_exception(
         &self,
         callsign: &str,
         timestamp: DateTime<FixedOffset>,
-    ) -> Option<CallInfo> {
-        if let Some(exception) = self.exceptions.list.iter().find(|e| e.call == callsign)
+    ) -> Option<&CallsignException> {
         // TODO: Find returns only the first match. Is this a possible error here?
-        {
-            if match (exception.start, exception.end) {
-                (Some(tstart), Some(tend)) => timestamp >= tstart && timestamp <= tend,
-                (Some(tstart), None) => timestamp >= tstart,
-                (None, Some(tend)) => timestamp <= tend,
-                (None, None) => false,
-            } {
-                Some(exception.into())
-            } else {
-                None
-            }
+        let exc = self.exceptions.list.iter().find(|e| e.call == callsign)?;
+
+        if is_in_time_window(timestamp, exc.start, exc.end) {
+            Some(exc)
+        } else {
+            None
+        }
+    }
+
+    /// Get cq zone by callsign if an exception for the callsign exists.
+    pub fn get_zone_exception(
+        &self,
+        callsign: &str,
+        timestamp: DateTime<FixedOffset>,
+    ) -> Option<u8> {
+        // TODO: Find returns only the first match. Is this a possible error here?
+        let exc = self
+            .zone_exceptions
+            .list
+            .iter()
+            .find(|o| o.call == callsign)?;
+
+        if is_in_time_window(timestamp, exc.start, exc.end) {
+            Some(exc.zone)
         } else {
             None
         }
@@ -64,111 +75,31 @@ impl ClubLog {
 
     /// Check if the callsign was used in an invalid operation.
     pub fn is_invalid_operation(&self, callsign: &str, timestamp: DateTime<FixedOffset>) -> bool {
-        if let Some(operation) = self
+        // TODO: Find returns only the first match. Is this a possible error here?
+        if let Some(op) = self
             .invalid_operations
             .list
             .iter()
             .find(|o| o.call == callsign)
-        // TODO: Find returns only the first match. Is this a possible error here?
         {
-            match (operation.start, operation.end) {
-                (Some(tstart), Some(tend)) => timestamp >= tstart && timestamp <= tend,
-                (Some(tstart), None) => timestamp >= tstart,
-                (None, Some(tend)) => timestamp <= tend,
-                (None, None) => false,
-            }
+            is_in_time_window(timestamp, op.start, op.end)
         } else {
             false
         }
     }
-
-    // Check if the callsign at the given time falls within the period of activity in another CQ zone.
-    pub fn get_zone_exception(
-        &self,
-        callsign: &str,
-        timestamp: DateTime<FixedOffset>,
-    ) -> Option<u8> {
-        if let Some(exception) = self
-            .zone_exceptions
-            .list
-            .iter()
-            .find(|o| o.call == callsign)
-        // TODO: Find returns only the first match. Is this a possible error here?
-        {
-            if match (exception.start, exception.end) {
-                (Some(tstart), Some(tend)) => timestamp >= tstart && timestamp <= tend,
-                (Some(tstart), None) => timestamp >= tstart,
-                (None, Some(tend)) => timestamp <= tend,
-                (None, None) => false,
-            } {
-                Some(exception.zone)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
 }
 
-/// Callsign information
-#[derive(Debug)]
-pub struct CallInfo {
-    /// Name
-    pub country: String,
-    /// Main callsign prefix
-    pub prefix: String,
-    /// ADIF identifier
-    pub adif: Option<u16>,
-    /// CQ zone
-    pub cqz: Option<u8>,
-    /// Continent
-    pub cont: Option<String>,
-    /// Longitude
-    pub long: Option<f32>,
-    /// Latitude
-    pub lat: Option<f32>,
-}
-
-impl From<&Entity> for CallInfo {
-    fn from(entity: &Entity) -> Self {
-        Self {
-            country: entity.name.clone(),
-            prefix: entity.prefix.clone(),
-            adif: Some(entity.adif),
-            cqz: Some(entity.cqz),
-            cont: Some(entity.cont.clone()),
-            long: Some(entity.long),
-            lat: Some(entity.lat),
-        }
-    }
-}
-
-impl From<&Prefix> for CallInfo {
-    fn from(prefix: &Prefix) -> Self {
-        Self {
-            country: prefix.entity.clone(),
-            prefix: prefix.call.clone(), // TODO: prefix != callsign, maybe generic CallInfo not required. Use specific type instead
-            adif: prefix.adif,
-            cqz: prefix.cqz,
-            cont: prefix.cont.clone(),
-            long: prefix.long,
-            lat: prefix.lat,
-        }
-    }
-}
-
-impl From<&CallsignException> for CallInfo {
-    fn from(exception: &CallsignException) -> Self {
-        Self {
-            country: exception.entity.clone(),
-            prefix: exception.call.clone(), // TODO: prefix != callsign, maybe generic CallInfo not required. Use specific type instead
-            adif: Some(exception.adif),
-            cqz: Some(exception.cqz),
-            cont: Some(exception.cont.clone()),
-            long: Some(exception.long),
-            lat: Some(exception.lat),
-        }
+/// Check wether a timestamp is within an optional start and end timestamp.
+fn is_in_time_window(
+    timestamp: DateTime<FixedOffset>,
+    start: Option<DateTime<FixedOffset>>,
+    end: Option<DateTime<FixedOffset>>,
+) -> bool {
+    match (start, end) {
+        (Some(tstart), Some(tend)) => timestamp >= tstart && timestamp <= tend,
+        (Some(tstart), None) => timestamp >= tstart,
+        (None, Some(tend)) => timestamp <= tend,
+        (None, None) => true,
     }
 }
 
@@ -427,6 +358,7 @@ pub struct ZoneException {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
     use std::fs;
 
     fn read_clublog_xml() -> ClubLog {
@@ -449,19 +381,22 @@ mod tests {
 
     #[test]
     fn lookup_prefix_ok() {
-        let info = read_clublog_xml().lookup_prefix("DA").unwrap();
+        let clublog = read_clublog_xml();
+        let info = clublog.get_prefix("DA", Utc::now().into()).unwrap();
         assert_eq!(info.adif, Some(230));
     }
 
     #[test]
     fn lookup_prefix_err() {
-        let info = read_clublog_xml().lookup_prefix("FOO");
+        let clublog = read_clublog_xml();
+        let info = clublog.get_prefix("FOO", Utc::now().into());
         assert!(info.is_none());
     }
 
     #[test]
     fn callsign_exception_ok() {
-        let call_exc = read_clublog_xml().get_callsign_exception(
+        let clublog = read_clublog_xml();
+        let call_exc = clublog.get_callsign_exception(
             "KC6RJW",
             DateTime::parse_from_rfc3339("2003-01-01T00:00:00+00:00").unwrap(),
         );
@@ -470,7 +405,8 @@ mod tests {
 
     #[test]
     fn callsign_exception_err() {
-        let call_exc = read_clublog_xml().get_callsign_exception(
+        let clublog = read_clublog_xml();
+        let call_exc = clublog.get_callsign_exception(
             "A1B",
             DateTime::parse_from_rfc3339("2001-01-01T00:00:00+00:00").unwrap(),
         );
@@ -479,7 +415,8 @@ mod tests {
 
     #[test]
     fn invalid_operation_ok() {
-        let invalid = read_clublog_xml().is_invalid_operation(
+        let clublog = read_clublog_xml();
+        let invalid = clublog.is_invalid_operation(
             "T88A",
             DateTime::parse_from_rfc3339("1995-07-01T00:00:00+00:00").unwrap(),
         );
@@ -488,7 +425,8 @@ mod tests {
 
     #[test]
     fn invalid_operation_err() {
-        let invalid = read_clublog_xml().is_invalid_operation(
+        let clublog = read_clublog_xml();
+        let invalid = clublog.is_invalid_operation(
             "DL1FOO",
             DateTime::parse_from_rfc3339("2001-01-01T00:00:00+00:00").unwrap(),
         );
@@ -497,7 +435,8 @@ mod tests {
 
     #[test]
     fn zone_exception_ok() {
-        let exception = read_clublog_xml().get_zone_exception(
+        let clublog = read_clublog_xml();
+        let exception = clublog.get_zone_exception(
             "KD6WW/VY0",
             DateTime::parse_from_rfc3339("2003-07-30T12:00:00+00:00").unwrap(),
         );
@@ -506,7 +445,8 @@ mod tests {
 
     #[test]
     fn zone_exception_err() {
-        let exception = read_clublog_xml().get_zone_exception(
+        let clublog = read_clublog_xml();
+        let exception = clublog.get_zone_exception(
             "DL1FOO",
             DateTime::parse_from_rfc3339("2001-01-01T00:00:00+00:00").unwrap(),
         );
