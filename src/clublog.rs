@@ -5,6 +5,12 @@ use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Deserializer};
 use std::vec::Vec;
 
+/// ADIF DXCC identifier
+pub type Adif = u16;
+
+/// CQ zone
+pub type CqZone = u8;
+
 /// Errors
 #[derive(Debug)]
 pub struct Error;
@@ -16,7 +22,7 @@ impl ClubLog {
     }
 
     /// Get entity information by adif identifier.
-    pub fn get_entity(&self, adif: u16, timestamp: DateTime<FixedOffset>) -> Option<&Entity> {
+    pub fn get_entity(&self, adif: Adif, timestamp: DateTime<FixedOffset>) -> Option<&Entity> {
         let et = self.entities.list.iter().find(|e| e.adif == adif)?;
 
         if is_in_time_window(timestamp, et.start, et.end) {
@@ -58,7 +64,7 @@ impl ClubLog {
         &self,
         callsign: &str,
         timestamp: DateTime<FixedOffset>,
-    ) -> Option<u8> {
+    ) -> Option<CqZone> {
         // TODO: Find returns only the first match. Is this a possible error here?
         let exc = self
             .zone_exceptions
@@ -173,7 +179,7 @@ pub struct Entities {
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct Entity {
     /// ADIF identifier
-    pub adif: u16,
+    pub adif: Adif,
     /// Name
     pub name: String,
     /// Main callsign prefix
@@ -181,7 +187,7 @@ pub struct Entity {
     /// Entity deleted after [end](Entity::end)
     pub deleted: bool,
     /// CQ zone
-    pub cqz: u8,
+    pub cqz: CqZone,
     /// Continent
     pub cont: String,
     /// Longitude
@@ -230,9 +236,9 @@ pub struct CallsignException {
     /// Name of entity
     pub entity: String,
     /// ADIF identifier
-    pub adif: u16,
+    pub adif: Adif,
     /// CQ zone
-    pub cqz: u8,
+    pub cqz: CqZone,
     /// Continent
     pub cont: String,
     /// Longitude
@@ -275,9 +281,9 @@ pub struct Prefix {
     /// Name of entity
     pub entity: String,
     /// ADIF identifier
-    pub adif: Option<u16>, // FIXME: acc. to xsd no option required
+    pub adif: Option<Adif>, // FIXME: acc. to xsd no option required
     /// CQ zone
-    pub cqz: Option<u8>, // FIXME: acc. to xsd no option required
+    pub cqz: Option<CqZone>, // FIXME: acc. to xsd no option required
     /// Continent
     pub cont: Option<String>, // FIXME: acc. to xsd no option required
     /// Longitude
@@ -344,7 +350,7 @@ pub struct ZoneException {
     /// Callsign
     pub call: String,
     /// CQ zone
-    pub zone: u8,
+    pub zone: CqZone,
     /// Start timestamp of exception
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
