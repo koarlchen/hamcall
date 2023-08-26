@@ -2,7 +2,7 @@ use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use callsign::CallsignError;
+use callsign::call;
 
 // Usage `call FNAME`
 pub fn main() {
@@ -17,9 +17,9 @@ pub fn main() {
 
         for call in calls {
             let call = call.unwrap();
-            match callsign::analyze_callsign(&call) {
+            match call::analyze_callsign(&call) {
                 Ok(c) => println!("{} => {:?}", call, c),
-                Err(e) if e == CallsignError::InternalError => {
+                Err(e) if e == call::CallsignError::InternalError => {
                     panic!("Internal error occurred for '{}'", call);
                 }
                 Err(e) => eprintln!("{} => {:?}", call, e),

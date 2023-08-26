@@ -8,7 +8,7 @@ pub fn main() {
         println!("Usage `call CALLSIGN`");
     } else {
         let call = &args[1];
-        match callsign::analyze_callsign(call) {
+        match callsign::call::analyze_callsign(call) {
             Ok(c) => println!("{} => {:?}", call, c),
             Err(e) => eprintln!("{} => {:?}", call, e),
         }
