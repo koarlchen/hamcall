@@ -343,12 +343,16 @@ pub struct ZoneException {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
+    use lazy_static::lazy_static;
     use std::fs;
 
-    fn read_clublog_xml() -> ClubLog {
-        let raw = fs::read_to_string("data/clublog/cty.xml").unwrap();
-        ClubLog::parse(&raw).unwrap()
+    fn read_clublog_xml() -> &'static ClubLog {
+        lazy_static! {
+            static ref CLUBLOG: ClubLog =
+                ClubLog::parse(&fs::read_to_string("data/clublog/cty.xml").unwrap()).unwrap();
+        }
+
+        &*CLUBLOG
     }
 
     #[test]
@@ -367,14 +371,42 @@ mod tests {
     #[test]
     fn lookup_prefix_ok() {
         let clublog = read_clublog_xml();
-        let info = clublog.get_prefix("DA", Utc::now().into()).unwrap();
+        let info = clublog
+            .get_prefix(
+                "DA",
+                DateTime::parse_from_rfc3339("2020-01-01T00:00:00+00:00").unwrap(),
+            )
+            .unwrap();
         assert_eq!(info.adif, Some(230));
+    }
+
+    #[test]
+    fn lookup_prefix_ok_time() {
+        let clublog = read_clublog_xml();
+        let y1 = clublog
+            .get_prefix(
+                "Y2",
+                DateTime::parse_from_rfc3339("1980-01-01T00:00:00+00:00").unwrap(),
+            )
+            .unwrap();
+        let y2 = clublog
+            .get_prefix(
+                "Y2",
+                DateTime::parse_from_rfc3339("1995-01-01T00:00:00+00:00").unwrap(),
+            )
+            .unwrap();
+
+        assert_eq!(y1.adif, Some(229));
+        assert_eq!(y2.adif, Some(230));
     }
 
     #[test]
     fn lookup_prefix_err() {
         let clublog = read_clublog_xml();
-        let info = clublog.get_prefix("FOO", Utc::now().into());
+        let info = clublog.get_prefix(
+            "FOO",
+            DateTime::parse_from_rfc3339("2020-01-01T00:00:00+00:00").unwrap(),
+        );
         assert!(info.is_none());
     }
 

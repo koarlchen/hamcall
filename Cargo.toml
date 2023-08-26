@@ -10,3 +10,6 @@ thiserror = "1.0.40"
 serde = { version = "1.0.164", features = ["derive"] }
 quick-xml = { version = "0.28.2", features = ["serialize"] }
 chrono = "0.4.26"
+
+[dev-dependencies]
+lazy_static = "1.4.0"
