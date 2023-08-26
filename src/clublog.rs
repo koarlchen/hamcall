@@ -1,7 +1,7 @@
 //! Parser for the club log xml based country and callsign information.
 //! Provides a few basic methods to query information out of the data.
 
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer};
 use std::vec::Vec;
 
@@ -22,7 +22,7 @@ impl ClubLog {
     }
 
     /// Get entity information by adif identifier.
-    pub fn get_entity(&self, adif: Adif, timestamp: DateTime<FixedOffset>) -> Option<&Entity> {
+    pub fn get_entity(&self, adif: Adif, timestamp: DateTime<Utc>) -> Option<&Entity> {
         self.entities
             .list
             .iter()
@@ -30,7 +30,7 @@ impl ClubLog {
     }
 
     /// Get prefix information by callsign prefix.
-    pub fn get_prefix(&self, prefix: &str, timestamp: DateTime<FixedOffset>) -> Option<&Prefix> {
+    pub fn get_prefix(&self, prefix: &str, timestamp: DateTime<Utc>) -> Option<&Prefix> {
         self.prefixes
             .list
             .iter()
@@ -41,7 +41,7 @@ impl ClubLog {
     pub fn get_callsign_exception(
         &self,
         callsign: &str,
-        timestamp: DateTime<FixedOffset>,
+        timestamp: DateTime<Utc>,
     ) -> Option<&CallsignException> {
         self.exceptions
             .list
@@ -50,11 +50,7 @@ impl ClubLog {
     }
 
     /// Get cq zone by callsign if an exception for the callsign exists.
-    pub fn get_zone_exception(
-        &self,
-        callsign: &str,
-        timestamp: DateTime<FixedOffset>,
-    ) -> Option<CqZone> {
+    pub fn get_zone_exception(&self, callsign: &str, timestamp: DateTime<Utc>) -> Option<CqZone> {
         let exc = self
             .zone_exceptions
             .list
@@ -65,7 +61,7 @@ impl ClubLog {
     }
 
     /// Check if the callsign was used in an invalid operation.
-    pub fn is_invalid_operation(&self, callsign: &str, timestamp: DateTime<FixedOffset>) -> bool {
+    pub fn is_invalid_operation(&self, callsign: &str, timestamp: DateTime<Utc>) -> bool {
         self.invalid_operations
             .list
             .iter()
@@ -76,9 +72,9 @@ impl ClubLog {
 
 /// Check wether a timestamp is within an optional start and end timestamp.
 fn is_in_time_window(
-    timestamp: DateTime<FixedOffset>,
-    start: Option<DateTime<FixedOffset>>,
-    end: Option<DateTime<FixedOffset>>,
+    timestamp: DateTime<Utc>,
+    start: Option<DateTime<Utc>>,
+    end: Option<DateTime<Utc>>,
 ) -> bool {
     match (start, end) {
         (Some(tstart), Some(tend)) => timestamp >= tstart && timestamp <= tend,
@@ -89,23 +85,27 @@ fn is_in_time_window(
 }
 
 /// Custom XML deserializer for a timestamp
-fn parse_datetime<'de, D>(deserializer: D) -> Result<DateTime<FixedOffset>, D::Error>
+fn parse_datetime<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
-    DateTime::parse_from_rfc3339(&s).map_err(serde::de::Error::custom)
+    DateTime::parse_from_rfc3339(&s)
+        .map(|d| d.into())
+        .map_err(serde::de::Error::custom)
 }
 
 /// Custom XML deserializer for an optional timestamp
-fn parse_datetime_opt<'de, D>(deserializer: D) -> Result<Option<DateTime<FixedOffset>>, D::Error>
+fn parse_datetime_opt<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
 
     Ok(Some(
-        DateTime::parse_from_rfc3339(&s).map_err(serde::de::Error::custom)?,
+        DateTime::parse_from_rfc3339(&s)
+            .map(|d| d.into())
+            .map_err(serde::de::Error::custom)?,
     ))
 }
 
@@ -117,7 +117,7 @@ pub struct ClubLog {
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime")]
     #[serde(rename = "@date")]
-    pub date: DateTime<FixedOffset>,
+    pub date: DateTime<Utc>,
     /// XML namespace
     #[serde(rename = "@xmlns")]
     pub xmlns: String,
@@ -176,11 +176,11 @@ pub struct Entity {
     /// Start timestamp of validity
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
-    pub start: Option<DateTime<FixedOffset>>,
+    pub start: Option<DateTime<Utc>>,
     /// End timestamp of validity
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
-    pub end: Option<DateTime<FixedOffset>>,
+    pub end: Option<DateTime<Utc>>,
     /// True if only a whitelist of callsigns are valid for this entity
     pub whitelist: Option<bool>,
     /// Timestamp afer which the whitelist shall be used
@@ -227,11 +227,11 @@ pub struct CallsignException {
     /// Start timestamp of validity
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
-    pub start: Option<DateTime<FixedOffset>>,
+    pub start: Option<DateTime<Utc>>,
     /// End timestamp of validity
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
-    pub end: Option<DateTime<FixedOffset>>,
+    pub end: Option<DateTime<Utc>>,
 }
 
 /// List of callsign prefixes
@@ -272,11 +272,11 @@ pub struct Prefix {
     /// Start timestamp of validity
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
-    pub start: Option<DateTime<FixedOffset>>,
+    pub start: Option<DateTime<Utc>>,
     /// End timestamp of validity
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
-    pub end: Option<DateTime<FixedOffset>>,
+    pub end: Option<DateTime<Utc>>,
 }
 
 /// List of invalid operations
@@ -302,11 +302,11 @@ pub struct InvalidOperation {
     /// Start timestamp of operation
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
-    pub start: Option<DateTime<FixedOffset>>,
+    pub start: Option<DateTime<Utc>>,
     /// End timestamp of operation
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
-    pub end: Option<DateTime<FixedOffset>>,
+    pub end: Option<DateTime<Utc>>,
 }
 
 /// List of CQ zone exceptions
@@ -333,11 +333,11 @@ pub struct ZoneException {
     /// Start timestamp of exception
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
-    pub start: Option<DateTime<FixedOffset>>,
+    pub start: Option<DateTime<Utc>>,
     /// End timestamp of exception
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
-    pub end: Option<DateTime<FixedOffset>>,
+    pub end: Option<DateTime<Utc>>,
 }
 
 #[cfg(test)]
@@ -374,7 +374,9 @@ mod tests {
         let info = clublog
             .get_prefix(
                 "DA",
-                DateTime::parse_from_rfc3339("2020-01-01T00:00:00+00:00").unwrap(),
+                DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                    .unwrap()
+                    .into(),
             )
             .unwrap();
         assert_eq!(info.adif, Some(230));
@@ -386,13 +388,17 @@ mod tests {
         let y1 = clublog
             .get_prefix(
                 "Y2",
-                DateTime::parse_from_rfc3339("1980-01-01T00:00:00+00:00").unwrap(),
+                DateTime::parse_from_rfc3339("1980-01-01T00:00:00Z")
+                    .unwrap()
+                    .into(),
             )
             .unwrap();
         let y2 = clublog
             .get_prefix(
                 "Y2",
-                DateTime::parse_from_rfc3339("1995-01-01T00:00:00+00:00").unwrap(),
+                DateTime::parse_from_rfc3339("1995-01-01T00:00:00Z")
+                    .unwrap()
+                    .into(),
             )
             .unwrap();
 
@@ -405,7 +411,9 @@ mod tests {
         let clublog = read_clublog_xml();
         let info = clublog.get_prefix(
             "FOO",
-            DateTime::parse_from_rfc3339("2020-01-01T00:00:00+00:00").unwrap(),
+            DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                .unwrap()
+                .into(),
         );
         assert!(info.is_none());
     }
@@ -415,7 +423,9 @@ mod tests {
         let clublog = read_clublog_xml();
         let call_exc = clublog.get_callsign_exception(
             "KC6RJW",
-            DateTime::parse_from_rfc3339("2003-01-01T00:00:00+00:00").unwrap(),
+            DateTime::parse_from_rfc3339("2003-01-01T00:00:00Z")
+                .unwrap()
+                .into(),
         );
         assert!(call_exc.is_some());
     }
@@ -425,7 +435,9 @@ mod tests {
         let clublog = read_clublog_xml();
         let call_exc = clublog.get_callsign_exception(
             "A1B",
-            DateTime::parse_from_rfc3339("2001-01-01T00:00:00+00:00").unwrap(),
+            DateTime::parse_from_rfc3339("2001-01-01T00:00:00Z")
+                .unwrap()
+                .into(),
         );
         assert!(call_exc.is_none());
     }
@@ -435,7 +447,9 @@ mod tests {
         let clublog = read_clublog_xml();
         let invalid = clublog.is_invalid_operation(
             "T88A",
-            DateTime::parse_from_rfc3339("1995-07-01T00:00:00+00:00").unwrap(),
+            DateTime::parse_from_rfc3339("1995-07-01T00:00:00Z")
+                .unwrap()
+                .into(),
         );
         assert!(invalid);
     }
@@ -445,7 +459,9 @@ mod tests {
         let clublog = read_clublog_xml();
         let invalid = clublog.is_invalid_operation(
             "DL1FOO",
-            DateTime::parse_from_rfc3339("2001-01-01T00:00:00+00:00").unwrap(),
+            DateTime::parse_from_rfc3339("2001-01-01T00:00:00Z")
+                .unwrap()
+                .into(),
         );
         assert!(!invalid);
     }
@@ -455,7 +471,9 @@ mod tests {
         let clublog = read_clublog_xml();
         let exception = clublog.get_zone_exception(
             "KD6WW/VY0",
-            DateTime::parse_from_rfc3339("2003-07-30T12:00:00+00:00").unwrap(),
+            DateTime::parse_from_rfc3339("2003-07-30T12:00:00Z")
+                .unwrap()
+                .into(),
         );
         assert_eq!(exception, Some(1));
     }
@@ -465,7 +483,9 @@ mod tests {
         let clublog = read_clublog_xml();
         let exception = clublog.get_zone_exception(
             "DL1FOO",
-            DateTime::parse_from_rfc3339("2001-01-01T00:00:00+00:00").unwrap(),
+            DateTime::parse_from_rfc3339("2001-01-01T00:00:00Z")
+                .unwrap()
+                .into(),
         );
         assert!(exception.is_none());
     }
