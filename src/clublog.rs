@@ -23,24 +23,18 @@ impl ClubLog {
 
     /// Get entity information by adif identifier.
     pub fn get_entity(&self, adif: Adif, timestamp: DateTime<FixedOffset>) -> Option<&Entity> {
-        let et = self.entities.list.iter().find(|e| e.adif == adif)?;
-
-        if is_in_time_window(timestamp, et.start, et.end) {
-            Some(et)
-        } else {
-            None
-        }
+        self.entities
+            .list
+            .iter()
+            .find(|e| e.adif == adif && is_in_time_window(timestamp, e.start, e.end))
     }
 
     /// Get prefix information by callsign prefix.
     pub fn get_prefix(&self, prefix: &str, timestamp: DateTime<FixedOffset>) -> Option<&Prefix> {
-        let pref = self.prefixes.list.iter().find(|p| p.call == prefix)?;
-
-        if is_in_time_window(timestamp, pref.start, pref.end) {
-            Some(pref)
-        } else {
-            None
-        }
+        self.prefixes
+            .list
+            .iter()
+            .find(|p| p.call == prefix && is_in_time_window(timestamp, p.start, p.end))
     }
 
     /// Get callsign exception information by callsign.
@@ -49,14 +43,10 @@ impl ClubLog {
         callsign: &str,
         timestamp: DateTime<FixedOffset>,
     ) -> Option<&CallsignException> {
-        // TODO: Find returns only the first match. Is this a possible error here?
-        let exc = self.exceptions.list.iter().find(|e| e.call == callsign)?;
-
-        if is_in_time_window(timestamp, exc.start, exc.end) {
-            Some(exc)
-        } else {
-            None
-        }
+        self.exceptions
+            .list
+            .iter()
+            .find(|e| e.call == callsign && is_in_time_window(timestamp, e.start, e.end))
     }
 
     /// Get cq zone by callsign if an exception for the callsign exists.
@@ -65,33 +55,22 @@ impl ClubLog {
         callsign: &str,
         timestamp: DateTime<FixedOffset>,
     ) -> Option<CqZone> {
-        // TODO: Find returns only the first match. Is this a possible error here?
         let exc = self
             .zone_exceptions
             .list
             .iter()
-            .find(|o| o.call == callsign)?;
+            .find(|o| o.call == callsign && is_in_time_window(timestamp, o.start, o.end))?;
 
-        if is_in_time_window(timestamp, exc.start, exc.end) {
-            Some(exc.zone)
-        } else {
-            None
-        }
+        Some(exc.zone)
     }
 
     /// Check if the callsign was used in an invalid operation.
     pub fn is_invalid_operation(&self, callsign: &str, timestamp: DateTime<FixedOffset>) -> bool {
-        // TODO: Find returns only the first match. Is this a possible error here?
-        if let Some(op) = self
-            .invalid_operations
+        self.invalid_operations
             .list
             .iter()
-            .find(|o| o.call == callsign)
-        {
-            is_in_time_window(timestamp, op.start, op.end)
-        } else {
-            false
-        }
+            .find(|o| o.call == callsign && is_in_time_window(timestamp, o.start, o.end))
+            .is_some()
     }
 }
 
