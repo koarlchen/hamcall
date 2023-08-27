@@ -242,7 +242,7 @@ pub fn analyze_callsign(
         clublog.get_prefix(&prefixes[0].part, timestamp).unwrap()
     };
 
-    // Handle prefixes that reference the entities ´INVALID´ and ´MARITIME MOBILE´
+    // Handle prefixes that reference the entities 'INVALID' and 'MARITIME MOBILE'
     if prefix.adif.is_none() {
         match prefix.entity.as_str() {
             PREFIX_INVALID => return Err(CallsignError::InvalidPrefix),
