@@ -11,6 +11,9 @@ pub type Adif = u16;
 /// CQ zone
 pub type CqZone = u8;
 
+/// Record identifier
+pub type RecordId = u16;
+
 /// Special value for the entity of an invalid prefix
 pub const PREFIX_INVALID: &str = "INVALID";
 
@@ -221,7 +224,7 @@ pub struct CallsignExceptions {
 pub struct CallsignException {
     /// Identifier
     #[serde(rename = "@record")]
-    pub record: u16,
+    pub record: RecordId,
     /// Callsign
     pub call: String,
     /// Name of entity
@@ -266,7 +269,7 @@ pub struct Prefixes {
 pub struct Prefix {
     /// Identifier
     #[serde(rename = "@record")]
-    pub record: u16,
+    pub record: RecordId,
     /// Callsign
     pub call: String,
     /// Name of entity
@@ -308,7 +311,7 @@ pub struct InvalidOperations {
 pub struct InvalidOperation {
     /// Identifier
     #[serde(rename = "@record")]
-    pub record: u16,
+    pub record: RecordId,
     /// Callsign
     pub call: String,
     /// Start timestamp of operation
@@ -337,7 +340,7 @@ pub struct ZoneExceptions {
 pub struct ZoneException {
     /// Identifier
     #[serde(rename = "@record")]
-    pub record: u16,
+    pub record: RecordId,
     /// Callsign
     pub call: String,
     /// CQ zone
