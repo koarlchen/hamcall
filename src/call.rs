@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn clublog_prefix_entity_invalid() {
-        // test for record 5028
+        // test for prefix record 5028
 
         let clublog = read_clublog_xml();
         let res = analyze_callsign(
@@ -331,7 +331,7 @@ mod tests {
 
     #[test]
     fn clublog_prefix_entity_mm() {
-        // test for record 7069
+        // test for prefix record 7069
 
         let clublog = read_clublog_xml();
         let res = analyze_callsign(
@@ -343,6 +343,8 @@ mod tests {
         )
         .unwrap();
         assert!(res.maritime_mobile);
+        assert!(!res.aeronautical_mobile);
+        assert!(!res.satelite);
     }
 
     #[test]
@@ -359,11 +361,13 @@ mod tests {
         )
         .unwrap();
         assert!(res.aeronautical_mobile);
+        assert!(!res.satelite);
+        assert!(!res.maritime_mobile);
     }
 
     #[test]
     fn clublog_call_exc_sat() {
-        // test for record 28169
+        // test for callsign exception record 28169
 
         let clublog = read_clublog_xml();
         let res = analyze_callsign(
@@ -375,5 +379,131 @@ mod tests {
         )
         .unwrap();
         assert!(res.satelite);
+        assert!(!res.aeronautical_mobile);
+        assert!(!res.maritime_mobile);
+    }
+
+    #[test]
+    fn special_suffix_am() {
+        let calls = vec![
+            "W1AW/AM",
+            "W1AM/P/AM",
+            "W1AW/AM/P",
+            "W1AW/P/AM/7",
+            "F/W1AW/AM",
+        ];
+
+        let clublog = read_clublog_xml();
+
+        for call in calls.iter() {
+            let res = analyze_callsign(
+                clublog,
+                call,
+                DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                    .unwrap()
+                    .into(),
+            )
+            .unwrap();
+            assert!(res.aeronautical_mobile);
+            assert!(!res.satelite);
+            assert!(!res.maritime_mobile);
+        }
+    }
+
+    #[test]
+    fn special_suffix_mm() {
+        let calls = vec![
+            "W1AW/MM",
+            "W1AM/P/MM",
+            "W1AW/MM/P",
+            "W1AW/P/MM/7",
+            "F/W1AW/MM",
+        ];
+
+        let clublog = read_clublog_xml();
+
+        for call in calls.iter() {
+            let res = analyze_callsign(
+                clublog,
+                call,
+                DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                    .unwrap()
+                    .into(),
+            )
+            .unwrap();
+            assert!(res.maritime_mobile);
+            assert!(!res.aeronautical_mobile);
+            assert!(!res.satelite);
+        }
+    }
+
+    #[test]
+    fn special_suffix_sat() {
+        let calls = vec![
+            "W1AW/SAT",
+            "W1AM/P/SAT",
+            "W1AW/SAT/P",
+            "W1AW/P/SAT/7",
+            "F/W1AW/SAT",
+        ];
+
+        let clublog = read_clublog_xml();
+
+        for call in calls.iter() {
+            let res = analyze_callsign(
+                clublog,
+                call,
+                DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                    .unwrap()
+                    .into(),
+            )
+            .unwrap();
+            assert!(res.satelite);
+            assert!(!res.aeronautical_mobile);
+            assert!(!res.maritime_mobile);
+        }
+    }
+
+    #[test]
+    fn genuine_calls() {
+        let calls = vec![
+            ("W1ABC", 291),
+            ("9A1ABC", 497),
+            ("A71AB", 376),
+            ("LM2T70Y", 266),
+        ];
+
+        let clublog = read_clublog_xml();
+
+        for call in calls.iter() {
+            let res = analyze_callsign(
+                clublog,
+                call.0,
+                DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                    .unwrap()
+                    .into(),
+            )
+            .unwrap();
+            assert_eq!(res.adif.unwrap(), call.1);
+        }
+    }
+
+    #[test]
+    fn prefixes() {
+        let calls = vec![("F/W1AW", 227), ("CE0Y/W1ABC", 47), ("W1ABC/CE0Y", 47)];
+
+        let clublog = read_clublog_xml();
+
+        for call in calls.iter() {
+            let res = analyze_callsign(
+                clublog,
+                call.0,
+                DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                    .unwrap()
+                    .into(),
+            )
+            .unwrap();
+            assert_eq!(res.adif.unwrap(), call.1);
+        }
     }
 }
