@@ -11,6 +11,18 @@ pub type Adif = u16;
 /// CQ zone
 pub type CqZone = u8;
 
+/// Special value for the entity of an invalid prefix
+pub const PREFIX_INVALID: &str = "INVALID";
+
+/// Special value for the entity of a prefix that is used maritime mobile
+pub const PREFIX_MARITIME_MOBILE: &str = "MARITIME MOBILE";
+
+/// Special value for the entity of a callsign exception that is aeronautical mobile only
+pub const CALLSIGN_EXCEPTION_AERONAUTICAL_MOBILE: &str = "AERONAUTICAL MOBILE";
+
+/// Special value for the entity of a callsign exception that is satellite, internet or repeater only
+pub const CALLSIGN_EXCEPTION_SATELLITE: &str = "SATELLITE, INTERNET OR REPEATER";
+
 /// Errors
 #[derive(Debug)]
 pub struct Error;
