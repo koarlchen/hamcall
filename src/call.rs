@@ -218,13 +218,19 @@ pub fn analyze_callsign(
     }
 
     // 8. Check if the single home call has a valid prefix
-    // Search from the beginning of the call char by char, add a char each round
+    // Search from the end of the call char by char, add a char each round.
+    //
+    // Rational for counting strategy:
+    // By example, the prefixes U1 and UA9 refer to different ADIF identifiers.
+    // If start searching from the first character of the call onwards,
+    // the call UA9ACB would get the ADIF identifier for the prefix U and not for the prefix UA9.
     let homecall = homecalls[0];
     let mut homecall_prefix: Option<&Prefix> = None;
-    for cnt in 1..homecall.part.len() + 1 {
+    for cnt in (1..homecall.part.len() + 1).rev() {
         let to_check = &homecall.part[0..cnt];
         if let Some(pref) = clublog.get_prefix(to_check, timestamp) {
             homecall_prefix = Some(pref);
+            break;
         }
     }
     if homecall_prefix.is_none() {
@@ -608,10 +614,12 @@ mod tests {
     #[test]
     fn genuine_calls() {
         let calls = vec![
-            ("W1ABC", 291),
-            ("9A1ABC", 497),
-            ("A71AB", 376),
-            ("LM2T70Y", 266),
+            ("W1ABC", 291),   // Basic call
+            ("9A1ABC", 497),  // Call beginning with a number
+            ("A71AB", 376),   // Call with two digits, one belonging to the prefix
+            ("LM2T70Y", 266), // Call with two separated digts
+            ("UA9ABC", 15),   // Check that the call is not matched for the prefix U
+            ("U1ABC", 54),    // Counterexample for the test call above
         ];
 
         let clublog = read_clublog_xml();
