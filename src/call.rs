@@ -97,7 +97,7 @@ pub enum CallsignError {
     SuffixPosition,
 
     #[error("Internal error")]
-    InternalError,
+    InternalError(String),
 }
 
 /// Special suffixes which will not be searched for in the list of prefixes
@@ -251,6 +251,27 @@ pub fn analyze_callsign(
         }
     }
 
+    // Check if a special prefix was found that does not feature a entity record (namely adif identifiers 997 and 998)
+    match prefix.entity.as_str() {
+        CALLSIGN_EXCEPTION_AERONAUTICAL_MOBILE => {
+            return Ok(Callsign::new_aeronautical_mobile(
+                call,
+                prefix.adif.ok_or(CallsignError::InternalError(
+                    "Special prefix referencing /AM missing the adif field".into(),
+                ))?,
+            ))
+        }
+        CALLSIGN_EXCEPTION_SATELLITE => {
+            return Ok(Callsign::new_satellite(
+                call,
+                prefix.adif.ok_or(CallsignError::InternalError(
+                    "Special prefix referencing /SAT missing the adif field".into(),
+                ))?,
+            ))
+        }
+        _ => (),
+    }
+
     // Handle special suffixes
     // Boath AM and SAT feature a record within the prefix list where also an adif identifier is given.
     // MM is not part of the prefix list and has therefore not adif identifier.
@@ -262,28 +283,53 @@ pub fn analyze_callsign(
     {
         match suffix_special.part.as_str() {
             "AM" => {
-                let pref = clublog
-                    .get_prefix("/AM", timestamp)
-                    .ok_or(CallsignError::InternalError)?;
-                let adif = pref.adif.ok_or(CallsignError::InternalError)?;
+                let pref =
+                    clublog
+                        .get_prefix("/AM", timestamp)
+                        .ok_or(CallsignError::InternalError(
+                            "Failed to get prefix for /AM".into(),
+                        ))?;
+                let adif = pref.adif.ok_or(CallsignError::InternalError(
+                    "Expected adif field to not be None".into(),
+                ))?;
                 return Ok(Callsign::new_aeronautical_mobile(call, adif));
             }
             "SAT" => {
-                let pref = clublog
-                    .get_prefix("/SAT", timestamp)
-                    .ok_or(CallsignError::InternalError)?;
-                let adif = pref.adif.ok_or(CallsignError::InternalError)?;
+                let pref =
+                    clublog
+                        .get_prefix("/SAT", timestamp)
+                        .ok_or(CallsignError::InternalError(
+                            "Failed to get prefix for /SAT".into(),
+                        ))?;
+                let adif = pref.adif.ok_or(CallsignError::InternalError(
+                    "Expected adif field to not be None".into(),
+                ))?;
                 return Ok(Callsign::new_satellite(call, adif));
             }
             "MM" => return Ok(Callsign::new_maritime_mobile(call)),
-            _ => return Err(CallsignError::InternalError),
+            _ => {
+                return Err(CallsignError::InternalError(
+                    "Unexpected special suffix. Failed to match to known value.".into(),
+                ))
+            }
         }
     }
 
     // Get referenced entity from prefix
     let entity = clublog
-        .get_entity(prefix.adif.unwrap(), timestamp)
-        .ok_or(CallsignError::InternalError)?;
+        .get_entity(
+            prefix.adif.ok_or(CallsignError::InternalError(
+                "Expected adif field to not be None".into(),
+            ))?,
+            timestamp,
+        )
+        .ok_or(CallsignError::InternalError(
+            format!(
+                "Failed to get entity for prefix with adif {}",
+                prefix.adif.unwrap()
+            )
+            .into(),
+        ))?;
 
     Ok(Callsign {
         call: String::from(call),
@@ -345,6 +391,24 @@ mod tests {
         assert!(res.maritime_mobile);
         assert!(!res.aeronautical_mobile);
         assert!(!res.satelite);
+    }
+
+    #[test]
+    fn clublog_prefix_am() {
+        // test for prefix record 10273
+
+        let clublog = read_clublog_xml();
+        let res = analyze_callsign(
+            clublog,
+            "RS80KEDR",
+            DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                .unwrap()
+                .into(),
+        )
+        .unwrap();
+        assert!(res.satelite);
+        assert!(!res.aeronautical_mobile);
+        assert!(!res.maritime_mobile);
     }
 
     #[test]
