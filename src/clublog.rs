@@ -80,8 +80,7 @@ impl ClubLog {
         self.invalid_operations
             .list
             .iter()
-            .find(|o| o.call == callsign && is_in_time_window(timestamp, o.start, o.end))
-            .is_some()
+            .any(|o| o.call == callsign && is_in_time_window(timestamp, o.start, o.end))
     }
 }
 

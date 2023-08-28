@@ -323,13 +323,10 @@ pub fn analyze_callsign(
             ))?,
             timestamp,
         )
-        .ok_or(CallsignError::InternalError(
-            format!(
-                "Failed to get entity for prefix with adif {}",
-                prefix.adif.unwrap()
-            )
-            .into(),
-        ))?;
+        .ok_or(CallsignError::InternalError(format!(
+            "Failed to get entity for prefix with adif {}",
+            prefix.adif.unwrap()
+        )))?;
 
     Ok(Callsign {
         call: String::from(call),
