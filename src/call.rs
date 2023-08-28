@@ -220,9 +220,9 @@ pub fn analyze_callsign(
     // 8. Check if the single home call has a valid prefix
     // Search from the end of the call char by char, add a char each round.
     //
-    // Rational for counting strategy:
-    // By example, the prefixes U1 and UA9 refer to different ADIF identifiers.
-    // If start searching from the first character of the call onwards,
+    // Rationale for counting strategy:
+    // By example, the prefixes U and UA9 refer to different ADIF identifiers.
+    // If start the search from the first character of the call onwards,
     // the call UA9ACB would get the ADIF identifier for the prefix U and not for the prefix UA9.
     let homecall = homecalls[0];
     let mut homecall_prefix: Option<&Prefix> = None;
