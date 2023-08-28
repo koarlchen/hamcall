@@ -175,7 +175,7 @@ pub fn analyze_callsign(
     for split in splits.iter() {
         let split_type = match (
             SUFFIX_IGNORE.contains(split) || SUFFIX_SPECIAL.contains(split),
-            clublog.get_prefix(split, timestamp).is_some(),
+            get_prefix(clublog, split, timestamp)?.is_some(),
             RE_HOMECALL.is_match(split),
         ) {
             (true, _, _) => PartType::Suffix,
@@ -239,7 +239,7 @@ pub fn analyze_callsign(
     let prefix = if prefixes.is_empty() {
         homecall_prefix.unwrap()
     } else {
-        clublog.get_prefix(&prefixes[0].part, timestamp).unwrap()
+        get_prefix(clublog, &prefixes[0].part, timestamp)?.unwrap()
     };
 
     // Handle prefixes that reference the entities 'INVALID' and 'MARITIME MOBILE'
@@ -345,6 +345,52 @@ pub fn analyze_callsign(
     })
 }
 
+/// Method to get prefix information from clublog xml.
+///
+/// If the given prefix is not part in the prefix list check if the last character is a digit.
+/// If so, remove the last character and check again if the now shortened prefix is in the prefix list.
+///
+/// Rationale:
+/// By example, the prefix CT7 is not in the prefix list, since the correct prefix would be CT.
+/// Here the last digit of the prefix indicates, that a special part of the entity referenced by the prefix is activated, e.g. an island group.
+/// Therefore consider such prefixes as potentially valid and check the shortened version for validity.
+fn get_prefix<'a>(
+    clublog: &'a ClubLog,
+    prefix: &str,
+    timestamp: DateTime<Utc>,
+) -> Result<Option<&'a Prefix>, CallsignError> {
+    lazy_static! {
+        static ref RE_PREFIX: Regex = Regex::new(r"^.+?(\d)$").unwrap();
+    }
+
+    // 1. Check if the prefix is part of the clublog list
+    if let Some(pref) = clublog.get_prefix(prefix, timestamp) {
+        return Ok(Some(pref));
+    }
+
+    // 2. Remove last digit if present and check again if the shortened prefix is in the clublog list
+    if prefix
+        .chars()
+        .last()
+        .ok_or(CallsignError::InternalError(
+            "Cannot check prefix with length of zero".into(),
+        ))?
+        .is_numeric()
+    {
+        // Remove last character
+        let mut chars = prefix.chars();
+        chars.next_back();
+        let chars = chars.as_str();
+
+        // Check if shortened prefix is in list
+        if let Some(pref) = clublog.get_prefix(chars, timestamp) {
+            return Ok(Some(pref));
+        }
+    }
+
+    Ok(None)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,6 +404,40 @@ mod tests {
         }
 
         &*CLUBLOG
+    }
+
+    #[test]
+    fn get_prefix_special() {
+        let prefixes: Vec<(&str, Option<Adif>)> = vec![
+            ("CT", Some(272)),
+            ("CT7", Some(272)),
+            ("CT7A", None),
+            ("9A", Some(497)),
+            ("9A8", Some(497)),
+            ("9A8A", None),
+            ("A7", Some(376)),
+            ("A71", Some(376)),
+            ("A71A", None),
+            ("7", None),
+        ];
+
+        let clublog = read_clublog_xml();
+
+        for prefix in prefixes.iter() {
+            if let Some(res) = get_prefix(
+                &clublog,
+                prefix.0,
+                DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                    .unwrap()
+                    .into(),
+            )
+            .unwrap()
+            {
+                assert_eq!(res.adif.unwrap(), prefix.1.unwrap());
+            } else {
+                assert!(prefix.1.is_none());
+            }
+        }
     }
 
     #[test]
