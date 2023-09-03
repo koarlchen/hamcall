@@ -1,7 +1,14 @@
 [package]
 name = "callsign"
 version = "0.1.0"
+authors = ["Max <max@karl.wf>"]
 edition = "2021"
+license = "MPL-2.0"
+readme = "README.md"
+repository = "https://github.com/koarlchen/callsign.git"
+description = "Ham Radio callsign analyzer and ClubLog XML parser"
+keywords = ["ham", "ham-radio", "clublog", "callsign"]
+
 
 [dependencies]
 regex = "1.8.3"
