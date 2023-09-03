@@ -1,4 +1,3 @@
-use callsign::call;
 use callsign::clublog::Adif;
 use chrono::{DateTime, Utc};
 use std::env;
@@ -21,8 +20,19 @@ pub fn main() {
         let csv = read_csv(fname);
 
         for entry in csv {
-            match call::analyze_callsign(&clublog, &entry.0, entry.2) {
-                Ok(c) => println!("{} => {:?}", entry.0, c),
+            match callsign::call::analyze_callsign(&clublog, &entry.0, &entry.2) {
+                Ok(c) => {
+                    if let Some(adif) = c.adif {
+                        if entry.1 != adif {
+                            eprintln!(
+                                "{} => ADIF mismatch (theirs={} != mine={})",
+                                entry.0, entry.1, adif
+                            );
+                            continue;
+                        }
+                    }
+                    println!("{} => {:?}", entry.0, c);
+                }
                 Err(e) => eprintln!("{} => {:?}", entry.0, e),
             }
         }
@@ -31,7 +41,7 @@ pub fn main() {
 
 /// Read csv file with test data.
 ///
-/// The csv file is assumed to have the following column names where each column name contains the data of the named ADIF field.
+/// The csv file is assumed to have the following columns where the column names refer to ADIF fields
 /// <CALL>,<ADIF>,<QSO_DATE>,<TIME_ON>
 fn read_csv(fname: &str) -> Vec<(String, Adif, DateTime<Utc>)> {
     let mut result: Vec<(String, Adif, DateTime<Utc>)> = Vec::new();

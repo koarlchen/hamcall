@@ -26,6 +26,15 @@ pub const CALLSIGN_EXCEPTION_AERONAUTICAL_MOBILE: &str = "AERONAUTICAL MOBILE";
 /// Special value for the entity of a callsign exception that is satellite, internet or repeater only
 pub const CALLSIGN_EXCEPTION_SATELLITE: &str = "SATELLITE, INTERNET OR REPEATER";
 
+// ADIF identifier for maritime mobile (Important: clublog lists no prefix for /MM)
+pub const ADIF_ID_MARITIME_MOBILE: Adif = 999;
+
+// ADIF identifier for aeronautical mobile
+pub const ADIF_ID_AERONAUTICAL_MOBILE: Adif = 998;
+
+// ADIF identifier for satellite, internet or repeater
+pub const ADIF_ID_SATELLITE: Adif = 997;
+
 /// Errors
 #[derive(Debug)]
 pub struct Error;
@@ -37,7 +46,7 @@ impl ClubLog {
     }
 
     /// Get entity information by adif identifier.
-    pub fn get_entity(&self, adif: Adif, timestamp: DateTime<Utc>) -> Option<&Entity> {
+    pub fn get_entity(&self, adif: Adif, timestamp: &DateTime<Utc>) -> Option<&Entity> {
         self.entities
             .list
             .iter()
@@ -45,7 +54,7 @@ impl ClubLog {
     }
 
     /// Get prefix information by callsign prefix.
-    pub fn get_prefix(&self, prefix: &str, timestamp: DateTime<Utc>) -> Option<&Prefix> {
+    pub fn get_prefix(&self, prefix: &str, timestamp: &DateTime<Utc>) -> Option<&Prefix> {
         self.prefixes
             .list
             .iter()
@@ -56,7 +65,7 @@ impl ClubLog {
     pub fn get_callsign_exception(
         &self,
         callsign: &str,
-        timestamp: DateTime<Utc>,
+        timestamp: &DateTime<Utc>,
     ) -> Option<&CallsignException> {
         self.exceptions
             .list
@@ -65,7 +74,7 @@ impl ClubLog {
     }
 
     /// Get cq zone by callsign if an exception for the callsign exists.
-    pub fn get_zone_exception(&self, callsign: &str, timestamp: DateTime<Utc>) -> Option<CqZone> {
+    pub fn get_zone_exception(&self, callsign: &str, timestamp: &DateTime<Utc>) -> Option<CqZone> {
         let exc = self
             .zone_exceptions
             .list
@@ -76,7 +85,7 @@ impl ClubLog {
     }
 
     /// Check if the callsign was used in an invalid operation.
-    pub fn is_invalid_operation(&self, callsign: &str, timestamp: DateTime<Utc>) -> bool {
+    pub fn is_invalid_operation(&self, callsign: &str, timestamp: &DateTime<Utc>) -> bool {
         self.invalid_operations
             .list
             .iter()
@@ -86,14 +95,14 @@ impl ClubLog {
 
 /// Check wether a timestamp is within an optional start and end timestamp.
 fn is_in_time_window(
-    timestamp: DateTime<Utc>,
+    timestamp: &DateTime<Utc>,
     start: Option<DateTime<Utc>>,
     end: Option<DateTime<Utc>>,
 ) -> bool {
     match (start, end) {
-        (Some(tstart), Some(tend)) => timestamp >= tstart && timestamp <= tend,
-        (Some(tstart), None) => timestamp >= tstart,
-        (None, Some(tend)) => timestamp <= tend,
+        (Some(tstart), Some(tend)) => timestamp >= &tstart && timestamp <= &tend,
+        (Some(tstart), None) => timestamp >= &tstart,
+        (None, Some(tend)) => timestamp <= &tend,
         (None, None) => true,
     }
 }
@@ -198,7 +207,9 @@ pub struct Entity {
     /// True if only a whitelist of callsigns are valid for this entity
     pub whitelist: Option<bool>,
     /// Timestamp afer which the whitelist shall be used
-    pub whitelist_start: Option<String>,
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime_opt")]
+    pub whitelist_start: Option<DateTime<Utc>>,
 }
 
 /// List of callsign exceptions
@@ -388,7 +399,7 @@ mod tests {
         let info = clublog
             .get_prefix(
                 "DA",
-                DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                &DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
                     .unwrap()
                     .into(),
             )
@@ -402,7 +413,7 @@ mod tests {
         let y1 = clublog
             .get_prefix(
                 "Y2",
-                DateTime::parse_from_rfc3339("1980-01-01T00:00:00Z")
+                &DateTime::parse_from_rfc3339("1980-01-01T00:00:00Z")
                     .unwrap()
                     .into(),
             )
@@ -410,7 +421,7 @@ mod tests {
         let y2 = clublog
             .get_prefix(
                 "Y2",
-                DateTime::parse_from_rfc3339("1995-01-01T00:00:00Z")
+                &DateTime::parse_from_rfc3339("1995-01-01T00:00:00Z")
                     .unwrap()
                     .into(),
             )
@@ -425,7 +436,7 @@ mod tests {
         let clublog = read_clublog_xml();
         let info = clublog.get_prefix(
             "FOO",
-            DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+            &DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
                 .unwrap()
                 .into(),
         );
@@ -437,7 +448,7 @@ mod tests {
         let clublog = read_clublog_xml();
         let call_exc = clublog.get_callsign_exception(
             "KC6RJW",
-            DateTime::parse_from_rfc3339("2003-01-01T00:00:00Z")
+            &DateTime::parse_from_rfc3339("2003-01-01T00:00:00Z")
                 .unwrap()
                 .into(),
         );
@@ -449,7 +460,7 @@ mod tests {
         let clublog = read_clublog_xml();
         let call_exc = clublog.get_callsign_exception(
             "A1B",
-            DateTime::parse_from_rfc3339("2001-01-01T00:00:00Z")
+            &DateTime::parse_from_rfc3339("2001-01-01T00:00:00Z")
                 .unwrap()
                 .into(),
         );
@@ -461,7 +472,7 @@ mod tests {
         let clublog = read_clublog_xml();
         let invalid = clublog.is_invalid_operation(
             "T88A",
-            DateTime::parse_from_rfc3339("1995-07-01T00:00:00Z")
+            &DateTime::parse_from_rfc3339("1995-07-01T00:00:00Z")
                 .unwrap()
                 .into(),
         );
@@ -473,7 +484,7 @@ mod tests {
         let clublog = read_clublog_xml();
         let invalid = clublog.is_invalid_operation(
             "DL1FOO",
-            DateTime::parse_from_rfc3339("2001-01-01T00:00:00Z")
+            &DateTime::parse_from_rfc3339("2001-01-01T00:00:00Z")
                 .unwrap()
                 .into(),
         );
@@ -485,7 +496,7 @@ mod tests {
         let clublog = read_clublog_xml();
         let exception = clublog.get_zone_exception(
             "KD6WW/VY0",
-            DateTime::parse_from_rfc3339("2003-07-30T12:00:00Z")
+            &DateTime::parse_from_rfc3339("2003-07-30T12:00:00Z")
                 .unwrap()
                 .into(),
         );
@@ -497,7 +508,7 @@ mod tests {
         let clublog = read_clublog_xml();
         let exception = clublog.get_zone_exception(
             "DL1FOO",
-            DateTime::parse_from_rfc3339("2001-01-01T00:00:00Z")
+            &DateTime::parse_from_rfc3339("2001-01-01T00:00:00Z")
                 .unwrap()
                 .into(),
         );

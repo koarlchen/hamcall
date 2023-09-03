@@ -15,7 +15,7 @@ pub fn main() {
         let raw = fs::read_to_string(file).unwrap();
         let clublog = callsign::clublog::ClubLog::parse(&raw).unwrap();
 
-        match callsign::call::analyze_callsign(&clublog, call, Utc::now()) {
+        match callsign::call::analyze_callsign(&clublog, call, &Utc::now()) {
             Ok(c) => println!("{} => {:?}", call, c),
             Err(e) => eprintln!("{} => {:?}", call, e),
         }
