@@ -11,9 +11,9 @@ keywords = ["ham", "ham-radio", "clublog", "callsign"]
 
 
 [dependencies]
-regex = "1.8.3"
+regex = "1.9.5"
 lazy_static = "1.4.0"
-thiserror = "1.0.40"
-serde = { version = "1.0.164", features = ["derive"] }
-quick-xml = { version = "0.28.2", features = ["serialize"] }
-chrono = "0.4.26"
+thiserror = "1.0.48"
+serde = { version = "1.0.188", features = ["derive"] }
+quick-xml = { version = "0.30.0", features = ["serialize"] }
+chrono = "0.4.28"
