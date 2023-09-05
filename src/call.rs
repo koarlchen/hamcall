@@ -31,8 +31,18 @@ pub struct Callsign {
 }
 
 impl Callsign {
+    /// Check if callsign is assigned to a special entity like /MM, /AM or /SAT.
+    pub fn is_special_entity(&self) -> Option<SpecialEntitySuffix> {
+        match self.adif {
+            Some(ADIF_ID_MARITIME_MOBILE) => Some(SpecialEntitySuffix::Mm),
+            Some(ADIF_ID_AERONAUTICAL_MOBILE) => Some(SpecialEntitySuffix::Am),
+            Some(ADIF_ID_SATELLITE) => Some(SpecialEntitySuffix::Sat),
+            _ => None,
+        }
+    }
+
     /// Instantiate a new maritime mobile callsign
-    pub fn new_maritime_mobile(call: &str) -> Callsign {
+    fn new_maritime_mobile(call: &str) -> Callsign {
         Callsign {
             call: String::from(call),
             dxcc: None,
@@ -45,7 +55,7 @@ impl Callsign {
     }
 
     /// Instantiate a new aeronautical mobile callsign
-    pub fn new_aeronautical_mobile(call: &str) -> Callsign {
+    fn new_aeronautical_mobile(call: &str) -> Callsign {
         Callsign {
             call: String::from(call),
             dxcc: None,
@@ -58,7 +68,7 @@ impl Callsign {
     }
 
     /// Instantiate a new satellite callsign
-    pub fn new_satellite(call: &str) -> Callsign {
+    fn new_satellite(call: &str) -> Callsign {
         Callsign {
             call: String::from(call),
             dxcc: None,
@@ -71,7 +81,7 @@ impl Callsign {
     }
 
     /// Instantiate a new callsign from a clublog prefix
-    pub fn from_prefix(call: &str, prefix: &Prefix) -> Callsign {
+    fn from_prefix(call: &str, prefix: &Prefix) -> Callsign {
         Callsign {
             call: String::from(call),
             dxcc: Some(prefix.entity.clone()),
@@ -84,7 +94,7 @@ impl Callsign {
     }
 
     /// Instantiate a new callsign from a clublog callsign exception
-    pub fn from_exception(call: &str, exc: &CallsignException) -> Callsign {
+    fn from_exception(call: &str, exc: &CallsignException) -> Callsign {
         Callsign {
             call: String::from(call),
             dxcc: Some(exc.entity.clone()),
@@ -142,7 +152,7 @@ enum State {
 
 /// Suffix that indicates that the calls entity may be ignored
 #[derive(PartialEq, Eq)]
-enum NoEntitySuffix {
+pub enum SpecialEntitySuffix {
     /// Maritime Mobile
     Mm,
     /// Aeronautical Mobile
@@ -299,9 +309,9 @@ pub fn analyze_callsign(
         // Example: W1AW/AM
         if let Some(suffix) = is_no_entity_by_suffix(&elements[1..])? {
             return Ok(match suffix {
-                NoEntitySuffix::Am => Callsign::new_aeronautical_mobile(call),
-                NoEntitySuffix::Mm => Callsign::new_maritime_mobile(call),
-                NoEntitySuffix::Sat => Callsign::new_satellite(call),
+                SpecialEntitySuffix::Am => Callsign::new_aeronautical_mobile(call),
+                SpecialEntitySuffix::Mm => Callsign::new_maritime_mobile(call),
+                SpecialEntitySuffix::Sat => Callsign::new_satellite(call),
             });
         }
 
@@ -411,7 +421,9 @@ fn is_invalid_prefix(prefix: &Prefix) -> bool {
 
 /// Check if a special suffix is present that indicates that the actual prefix of the call is not relevant.
 /// Such a suffix may for example be MM (maritime mobile).
-fn is_no_entity_by_suffix(suffixes: &[Element]) -> Result<Option<NoEntitySuffix>, CallsignError> {
+fn is_no_entity_by_suffix(
+    suffixes: &[Element],
+) -> Result<Option<SpecialEntitySuffix>, CallsignError> {
     let s: Vec<&Element> = suffixes
         .iter()
         .filter(|e| suffix_indicates_no_entity(&e.part).is_some())
@@ -428,11 +440,11 @@ fn is_no_entity_by_suffix(suffixes: &[Element]) -> Result<Option<NoEntitySuffix>
 
 /// Check if a potential suffix equals a special suffix which requires special treatment of the call prefix.
 /// For example AM (aeronautical mobile) indicates that the call prefix information may not need to be considered.
-fn suffix_indicates_no_entity(potential_suffix: &str) -> Option<NoEntitySuffix> {
+fn suffix_indicates_no_entity(potential_suffix: &str) -> Option<SpecialEntitySuffix> {
     match potential_suffix {
-        "MM" => Some(NoEntitySuffix::Mm),
-        "AM" => Some(NoEntitySuffix::Am),
-        "SAT" => Some(NoEntitySuffix::Sat),
+        "MM" => Some(SpecialEntitySuffix::Mm),
+        "AM" => Some(SpecialEntitySuffix::Am),
+        "SAT" => Some(SpecialEntitySuffix::Sat),
         _ => None,
     }
 }
