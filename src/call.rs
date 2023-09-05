@@ -1,3 +1,7 @@
+//! Analyzer for callsigns based on the data from the ClubLog XML to get further information like the callsigns entity.
+//!
+//! The example `call.rs` shows the basic usage of this module.
+
 use crate::clublog::{
     Adif, CallsignException, ClubLog, CqZone, Prefix, ADIF_ID_AERONAUTICAL_MOBILE,
     ADIF_ID_MARITIME_MOBILE, ADIF_ID_SATELLITE, PREFIX_INVALID, PREFIX_MARITIME_MOBILE,
@@ -66,7 +70,7 @@ impl Callsign {
         }
     }
 
-    /// Instantiate a new callsign from a clublog prefix entry
+    /// Instantiate a new callsign from a clublog prefix
     pub fn from_prefix(call: &str, prefix: &Prefix) -> Callsign {
         Callsign {
             call: String::from(call),
@@ -79,7 +83,7 @@ impl Callsign {
         }
     }
 
-    /// Instantiate a new callsign from a clublog callsign exception entry
+    /// Instantiate a new callsign from a clublog callsign exception
     pub fn from_exception(call: &str, exc: &CallsignException) -> Callsign {
         Callsign {
             call: String::from(call),
@@ -202,7 +206,7 @@ pub fn analyze_callsign(
         return Err(CallsignError::BasicFormat);
     }
 
-    // Check if the callsign was used in an invalid operation by checking clublog data
+    // Check if the callsign was used in an invalid operation
     if clublog.is_invalid_operation(call, timestamp) {
         return Err(CallsignError::Invalid("Invalid operation"));
     }
@@ -263,11 +267,9 @@ pub fn analyze_callsign(
     );
 
     // Possible state 1:
-    // The callsign consists of only one part with no prefix or suffix
+    // The callsign consists of only one part with no prefix nor suffix
     if state == State::SinglePrefix {
-        let prefix = get_prefix(clublog, call, timestamp, &elements[1..])
-            .unwrap()
-            .0;
+        let prefix = get_prefix(clublog, call, timestamp, &[]).unwrap().0;
 
         let res = if is_mm_entity(prefix) {
             Callsign::new_maritime_mobile(call)
@@ -283,12 +285,18 @@ pub fn analyze_callsign(
     // Possible state 2:
     // The callsign consists of a single prefix and zero or more suffixes
     if state == State::PrefixComplete(1) {
+        // Complete homecall
+        // Example: W1AW
         let homecall: &String = &elements[0].part;
+
+        // Prefix of the homecall
+        // Example: W for the homecall W1AW
         let homecall_prefix = get_prefix(clublog, homecall, timestamp, &elements[1..])
             .unwrap()
             .0;
 
         // Special suffix like /AM or /MM is present
+        // Example: W1AW/AM
         if let Some(suffix) = is_no_entity_by_suffix(&elements[1..])? {
             return Ok(match suffix {
                 NoEntitySuffix::Am => Callsign::new_aeronautical_mobile(call),
@@ -298,11 +306,14 @@ pub fn analyze_callsign(
         }
 
         // Entity name referenced in prefix is /MM
+        // Example: prefix record 7069
         if is_mm_entity(homecall_prefix) {
             return Ok(Callsign::new_maritime_mobile(call));
         }
 
         // Check if a single digit suffix is present
+        // If so, check if the single digit suffix changes the prefix to a different one
+        // Example: "SV0ABC/9" where SV is Greece, but SV9 is Crete
         if let Some(pref) = is_different_prefix_by_single_digit_suffix(
             clublog,
             homecall,
@@ -352,8 +363,9 @@ fn apply_cqzone_exception(clublog: &ClubLog, call: &mut Callsign, timestamp: &Da
     }
 }
 
-/// Check if the list of suffixes contains a suffix with a single digit that may indicate a different prefix or entity.
+/// Check if the list of suffixes contains a suffix with a single digit that may indicate a different prefix.
 /// If there is such single digit suffix replace the digit within the callsign and query information for the new prefix.
+/// Example: "SV0ABC/9" where SV is Greece, but SV9 is Crete
 fn is_different_prefix_by_single_digit_suffix<'a>(
     clublog: &'a ClubLog,
     homecall: &str,
@@ -364,6 +376,7 @@ fn is_different_prefix_by_single_digit_suffix<'a>(
         static ref RE: Regex = Regex::new(r"^([A-Z0-9]+)(\d)([A-Z0-9]+)$").unwrap();
     }
 
+    // Search for single digits in the list of suffixes
     let single_digits: Vec<&Element> = suffixes
         .iter()
         .filter(|e| is_single_digit_suffix(&e.part))
@@ -372,9 +385,10 @@ fn is_different_prefix_by_single_digit_suffix<'a>(
         0 => return Ok(None),
         1 => (),
         _ => {
+            // TODO: Should this be treated like an error? Just take the first? Ignore all of them?
             return Err(CallsignError::Invalid(
                 "Multiple single digit suffixes found",
-            ))
+            ));
         }
     }
     let new_digit = &single_digits[0].part;
@@ -423,8 +437,8 @@ fn suffix_indicates_no_entity(potential_suffix: &str) -> Option<NoEntitySuffix> 
     }
 }
 
-/// Check if the potential suffix is a speicial suffix.
-/// See [`SUFFIX_SPECIAL`].
+/// Check if the potential suffix is a special suffix.
+/// See [SUFFIX_SPECIAL].
 fn is_special_suffix(potential_suffix: &str) -> bool {
     SUFFIX_SPECIAL.contains(&potential_suffix)
 }
@@ -447,8 +461,9 @@ fn is_single_char_suffix(potential_suffix: &str) -> bool {
     }
 }
 
-/// Search for a matching prefix.
+/// Search for a matching prefix by brutforcing all possibilities.
 /// The potential prefix will be shortened char by char from the back until a prefix matches.
+/// Furthermore, to take in account of prefixes like SV/A, append all single char suffixes to the end of the potential prefix before checking for a match.
 /// Next to the prefix information the number of removed chars is returned.
 fn get_prefix<'a>(
     clublog: &'a ClubLog,
@@ -467,11 +482,15 @@ fn get_prefix<'a>(
         .collect::<Vec<&Element>>();
 
     // Bruteforce all possibilities
+    // Shortening the call from the back is required to due to calls like UA9ABC where both prefixes U and UA9 a potential matches,
+    // but the more explicit one is the correct one.
     let mut prefix: Option<(&Prefix, usize)> = None;
     for cnt in (1..len_potential_prefix + 1).rev() {
+        // Shortened call
         let slice = &potential_prefix[0..cnt];
 
         // Append all single chars to the call as <call>/<suffix> and check if the prefix is valid
+        // This check is required for prefixes like SV/A where the callsign SV1ABC/A shall match to
         for suffix in &single_char_suffixes {
             if let Some(pref) = clublog.get_prefix(&format!("{}/{}", slice, suffix.part), timestamp)
             {

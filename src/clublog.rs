@@ -1,5 +1,7 @@
-//! Parser for the club log xml based country and callsign information.
-//! Provides a few basic methods to query information out of the data.
+//! Implementation of a parser based on deserialization for the ClubLog XML based entity and callsign information.
+//! Next to that, the module provides a few basic methods to query information from the parsed data.
+//!
+//! The example `clublog.rs` shows the basic usage of this module.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer};
@@ -93,7 +95,7 @@ impl ClubLog {
     }
 }
 
-/// Check wether a timestamp is within an optional start and end timestamp.
+/// Check whether a timestamp is within an optional start and end timestamp.
 fn is_in_time_window(
     timestamp: &DateTime<Utc>,
     start: Option<DateTime<Utc>>,
@@ -176,8 +178,8 @@ pub struct Entities {
 /// If the field [whitelist](Entity::whitelist) is set to `true`, the entity is probably on the most wanted DXCC list.
 /// Therefore only approved callsigns shall be logged for that entity.
 /// The list of approved callsigns is part of the [callsign exception](CallsignException) list.
-/// May also check the field [whitelist_start](Entity::whitelist_start) after which contacts shall be checked against the whitelist.
-/// The timstamp is not necessarily present if a entity is whitelisted.
+/// May also have a look at the timestamps [whitelist_start](Entity::whitelist_start) and [whitelist_end](Entity::whitelist_end) to check whether a whitelist check is required or not.
+/// Note, that the timstamps are not necessarily present if a entity is whitelisted.
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct Entity {
     /// ADIF identifier
@@ -226,13 +228,17 @@ pub struct CallsignExceptions {
 
 /// Callsign exception.
 ///
-/// Represents an exceptions to a callsign [prefix](Prefix).
+/// An entry represents an exceptions to a callsign [prefix](Prefix).
 /// When searching for a matching entry the [callsign](CallsignException::call) must match exactly including prefix and suffix.
 ///
 /// An entry may indicate a different value for the fields [adif](CallsignException::adif), [cqz](CallsignException::cqz), [cont](CallsignException::cont), [cont](CallsignException::cont), [lat](CallsignException::lat) or [lat](CallsignException::long) compared to the values of the matching [prefix](Prefix) entry.
 /// While searching through the list of exceptions make sure to also validate against the optional [start](CallsignException::start) and [end](CallsignException::end) timestamps.
 ///
-/// Valid callsigns for a [whitelisted entity](Entity::whitelist) are also part of the callsign exception list.
+/// A few callsign exceptions refer in their [entity](CallsignException::entity) field special entity names for [aeronautical mobile](CALLSIGN_EXCEPTION_AERONAUTICAL_MOBILE) and [satellite, internet or repeater](CALLSIGN_EXCEPTION_SATELLITE).
+/// Within those entries the [adif](CallsignException::adif) field contains special identifiers for [aeronautical mobile](ADIF_ID_AERONAUTICAL_MOBILE) and [satellite, internet or repeater](ADIF_ID_SATELLITE).
+/// Note that those special adif identifiers or rather entities are not part of the [entity list](Entities).
+///
+/// Note: Valid callsigns for a [whitelisted entity](Entity::whitelist) are also part of the callsign exception list.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename = "Exception")]
 pub struct CallsignException {
@@ -273,12 +279,14 @@ pub struct Prefixes {
 /// Callsign prefix.
 ///
 /// Each prefix is representated by a single entry.
-/// For example the prefixes `DA` and `DB` do both refer to the same DXCC `FEDERAL REPUBLIC OF GERMANY`.
-/// Even all other fields of the two entries feature the same data.
+/// For example the prefixes `DL` and `DO` do both refer to the same DXCC `FEDERAL REPUBLIC OF GERMANY`.
+/// Even all other fields of that two entries feature the same data.
 /// While searching for a matching prefix make sure to also validate against the optional [start](Prefix::start) and [end](Prefix::end) timestamps.
 ///
 /// If the fields [adif](Prefix::adif), [cqz](Prefix::cqz), [cont](Prefix::cont), [long](Prefix::long) and [lat](Prefix::lat) are `None`
-/// the [entity](Prefix::entity) field may be `INVALID` or `MARITIME MOBILE`.
+/// the [entity](Prefix::entity) field may be [invalid](PREFIX_INVALID) or marked as [maritime mobile](PREFIX_MARITIME_MOBILE).
+///
+/// Note while searching for a prefix that next to obvious prefixes like `DL` there are also speical ones listed like `SV/A` to which callsigns like `SV1ABC/A` shall match.
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct Prefix {
     /// Identifier
