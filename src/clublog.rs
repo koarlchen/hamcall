@@ -289,15 +289,15 @@ pub struct Prefix {
     /// Name of entity
     pub entity: String,
     /// ADIF identifier
-    pub adif: Option<Adif>, // FIXME: acc. to xsd no option required
+    pub adif: Option<Adif>,
     /// CQ zone
-    pub cqz: Option<CqZone>, // FIXME: acc. to xsd no option required
+    pub cqz: Option<CqZone>,
     /// Continent
-    pub cont: Option<String>, // FIXME: acc. to xsd no option required
+    pub cont: Option<String>,
     /// Longitude
-    pub long: Option<f32>, // FIXME: acc. to xsd no option required
+    pub long: Option<f32>,
     /// Latitude
-    pub lat: Option<f32>, // FIXME: acc. to xsd no option required
+    pub lat: Option<f32>,
     /// Start timestamp of validity
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
