@@ -26,13 +26,13 @@ pub const CALLSIGN_EXCEPTION_AERONAUTICAL_MOBILE: &str = "AERONAUTICAL MOBILE";
 /// Special value for the entity of a callsign exception that is satellite, internet or repeater only
 pub const CALLSIGN_EXCEPTION_SATELLITE: &str = "SATELLITE, INTERNET OR REPEATER";
 
-// ADIF identifier for maritime mobile (Important: clublog lists no prefix for /MM)
+/// ADIF identifier for maritime mobile (Important: clublog lists no prefix for /MM)
 pub const ADIF_ID_MARITIME_MOBILE: Adif = 999;
 
-// ADIF identifier for aeronautical mobile
+/// ADIF identifier for aeronautical mobile
 pub const ADIF_ID_AERONAUTICAL_MOBILE: Adif = 998;
 
-// ADIF identifier for satellite, internet or repeater
+/// ADIF identifier for satellite, internet or repeater
 pub const ADIF_ID_SATELLITE: Adif = 997;
 
 /// Errors
@@ -206,10 +206,14 @@ pub struct Entity {
     pub end: Option<DateTime<Utc>>,
     /// True if only a whitelist of callsigns are valid for this entity
     pub whitelist: Option<bool>,
-    /// Timestamp afer which the whitelist shall be used
+    /// Timestamp after which the whitelist shall be used
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
     pub whitelist_start: Option<DateTime<Utc>>,
+    /// Timestamp after which the whitelist shall not be used anymore
+    #[serde(default)]
+    #[serde(deserialize_with = "parse_datetime_opt")]
+    pub whitelist_end: Option<DateTime<Utc>>,
 }
 
 /// List of callsign exceptions

@@ -173,6 +173,13 @@ pub fn check_whitelist(
                 }
             }
 
+            // Check if the given point in time is after the end of whitelisting for that entity
+            if let Some(whitelist_end) = entity.whitelist_end {
+                if *timestamp > whitelist_end {
+                    return true;
+                }
+            }
+
             return false;
         }
     }
