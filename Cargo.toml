@@ -1,5 +1,5 @@
 [package]
-name = "callsign"
+name = "hamcall"
 version = "0.1.0"
 authors = ["Max <max@karl.wf>"]
 edition = "2021"

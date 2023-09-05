@@ -1,5 +1,5 @@
-use callsign::clublog::Adif;
 use chrono::{DateTime, Utc};
+use hamcall::{call, clublog};
 use std::env;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
@@ -15,12 +15,12 @@ pub fn main() {
         let fname = &args[2];
 
         let raw = fs::read_to_string(xml).unwrap();
-        let clublog = callsign::clublog::ClubLog::parse(&raw).unwrap();
+        let clublog = clublog::ClubLog::parse(&raw).unwrap();
 
         let csv = read_csv(fname);
 
         for entry in csv {
-            match callsign::call::analyze_callsign(&clublog, &entry.0, &entry.2) {
+            match call::analyze_callsign(&clublog, &entry.0, &entry.2) {
                 Ok(c) => {
                     if let Some(adif) = c.adif {
                         if entry.1 != adif {
@@ -43,8 +43,8 @@ pub fn main() {
 ///
 /// The csv file is assumed to have the following columns where the column names refer to ADIF fields
 /// <CALL>,<ADIF>,<QSO_DATE>,<TIME_ON>
-fn read_csv(fname: &str) -> Vec<(String, Adif, DateTime<Utc>)> {
-    let mut result: Vec<(String, Adif, DateTime<Utc>)> = Vec::new();
+fn read_csv(fname: &str) -> Vec<(String, clublog::Adif, DateTime<Utc>)> {
+    let mut result: Vec<(String, clublog::Adif, DateTime<Utc>)> = Vec::new();
 
     let file = File::open(fname).unwrap();
     let lines = BufReader::new(file).lines();
@@ -55,7 +55,7 @@ fn read_csv(fname: &str) -> Vec<(String, Adif, DateTime<Utc>)> {
         let splits: Vec<&str> = line.split(',').collect();
 
         let call = String::from(splits[0]);
-        let adif = splits[1].parse::<Adif>().unwrap();
+        let adif = splits[1].parse::<clublog::Adif>().unwrap();
         let timestamp: DateTime<Utc> = DateTime::parse_from_str(
             &format!("{} {} +0000", splits[2], splits[3]),
             "%Y%m%d %H%M %z",

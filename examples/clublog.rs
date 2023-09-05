@@ -1,4 +1,3 @@
-use callsign::clublog;
 use chrono::Utc;
 use std::env;
 use std::fs;
@@ -10,7 +9,7 @@ pub fn main() {
         println!("Usage `call CLUBLOGXML PREFIX`");
     } else {
         let raw = fs::read_to_string(&args[1]).unwrap();
-        let clublog = clublog::ClubLog::parse(&raw).unwrap();
+        let clublog = hamcall::clublog::ClubLog::parse(&raw).unwrap();
 
         println!("Query information for prefix '{}'", args[2]);
 
