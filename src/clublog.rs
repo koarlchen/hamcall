@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 //! Implementation of a parser based on deserialization for the ClubLog XML based entity and callsign information.
 //! Next to that, the module provides a few basic methods to query information from the parsed data.
 //!
