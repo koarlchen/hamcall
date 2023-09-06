@@ -118,9 +118,24 @@ pub enum CallsignError {
     #[error("Callsign is of invalid format or includes invalid characters")]
     BasicFormat,
 
-    /// Callsign is invalid
-    #[error("Callsign is invalid")]
-    Invalid(&'static str),
+    /// Callsign was used in an invalid operation
+    #[error("Callsign was used in an invalid operation")]
+    InvalidOperation,
+
+    #[error("Callsign does not begin with a valid prefix")]
+    BeginWithoutPrefix,
+
+    /// Unexpected third prefix
+    #[error("Unexpected third prefix")]
+    ThirdPrefix,
+
+    /// Multiple single digit suffixes
+    #[error("Multiple single digit suffixes")]
+    MultipleSingleDigitSuffix,
+
+    /// Multiple special suffixes that indicate not entity
+    #[error("Multiple special suffixes that indicate not entity")]
+    MultipleSpecialSuffix,
 }
 
 /// Special suffixes that may not be interpreted as prefixes
@@ -222,7 +237,7 @@ pub fn analyze_callsign(
 
     // Check if the callsign was used in an invalid operation
     if clublog.is_invalid_operation(call, timestamp) {
-        return Err(CallsignError::Invalid("Invalid operation"));
+        return Err(CallsignError::InvalidOperation);
     }
 
     // Check if clublog lists a callsign exception
@@ -262,14 +277,10 @@ pub fn analyze_callsign(
     for element in elements.iter() {
         match (&state, &element.parttype) {
             (State::NoPrefix, PartType::Prefix) => state = State::SinglePrefix,
-            (State::NoPrefix, PartType::Other) => Err(CallsignError::Invalid(
-                "Callsign does not begin with a valid prefix",
-            ))?,
+            (State::NoPrefix, PartType::Other) => Err(CallsignError::BeginWithoutPrefix)?,
             (State::SinglePrefix, PartType::Prefix) => state = State::PrefixComplete(2),
             (State::SinglePrefix, PartType::Other) => state = State::PrefixComplete(1),
-            (State::PrefixComplete(_), PartType::Prefix) => {
-                Err(CallsignError::Invalid("Unexpected third prefix"))?
-            }
+            (State::PrefixComplete(_), PartType::Prefix) => Err(CallsignError::ThirdPrefix)?,
             (State::PrefixComplete(_), PartType::Other) => (),
         }
     }
@@ -400,9 +411,7 @@ fn is_different_prefix_by_single_digit_suffix<'a>(
         1 => (),
         _ => {
             // TODO: Should this be treated like an error? Just take the first? Ignore all of them?
-            return Err(CallsignError::Invalid(
-                "Multiple single digit suffixes found",
-            ));
+            return Err(CallsignError::MultipleSingleDigitSuffix);
         }
     }
     let new_digit = &single_digits[0].part;
@@ -436,9 +445,7 @@ fn is_no_entity_by_suffix(
     match s.len() {
         0 => Ok(None),
         1 => Ok(suffix_indicates_no_entity(&s[0].part)),
-        _ => Err(CallsignError::Invalid(
-            "Multiple suffixes that indicate no entity",
-        )),
+        _ => Err(CallsignError::MultipleSpecialSuffix),
     }
 }
 
@@ -559,7 +566,7 @@ mod tests {
                     .into(),
             );
 
-            assert!(res.is_err()); // TODO: Somehow check for exact error, prevent pass of test case caused by internal error
+            assert_eq!(res, Err(CallsignError::BeginWithoutPrefix));
         }
     }
 
