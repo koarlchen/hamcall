@@ -24,9 +24,14 @@ pub fn main() {
                 Ok(c) => {
                     if let Some(adif) = c.adif {
                         if entry.1 != adif {
+                            let entity_theirs = &clublog
+                                .get_entity(entry.1, &entry.2)
+                                .map_or("", |e| &e.name);
+                            let entity_mine =
+                                &clublog.get_entity(adif, &entry.2).map_or("", |e| &e.name);
                             eprintln!(
-                                "{} => ADIF mismatch (theirs={} != mine={})",
-                                entry.0, entry.1, adif
+                                "{} => ADIF mismatch (theirs={} ({:?}) != mine={} ({:?}))",
+                                entry.0, entry.1, entity_theirs, adif, entity_mine
                             );
                             continue;
                         }
