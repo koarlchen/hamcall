@@ -152,7 +152,7 @@ pub struct ClubLog {
     pub xmlns: String,
     /// List of entities
     pub entities: Entities,
-    /// List of exceptions
+    /// List of callsign exceptions
     pub exceptions: CallsignExceptions,
     /// List of prefixes
     pub prefixes: Prefixes,
@@ -233,7 +233,7 @@ pub struct CallsignExceptions {
 /// Callsign exception.
 ///
 /// An entry represents an exceptions to a callsign [prefix](Prefix).
-/// When searching for a matching entry the [callsign](CallsignException::call) must match exactly including prefix and suffix.
+/// When searching for a matching entry the [callsign](CallsignException::call) must match exactly including prefix, suffix and appendix.
 ///
 /// An entry may indicate a different value for the fields [adif](CallsignException::adif), [cqz](CallsignException::cqz), [cont](CallsignException::cont), [cont](CallsignException::cont), [lat](CallsignException::lat) or [lat](CallsignException::long) compared to the values of the matching [prefix](Prefix) entry.
 /// While searching through the list of exceptions make sure to also validate against the optional [start](CallsignException::start) and [end](CallsignException::end) timestamps.
@@ -290,7 +290,7 @@ pub struct Prefixes {
 /// If the fields [adif](Prefix::adif), [cqz](Prefix::cqz), [cont](Prefix::cont), [long](Prefix::long) and [lat](Prefix::lat) are `None`
 /// the [entity](Prefix::entity) field may be [invalid](PREFIX_INVALID) or marked as [maritime mobile](PREFIX_MARITIME_MOBILE).
 ///
-/// Note while searching for a prefix that next to obvious prefixes like `DL` there are also speical ones listed like `SV/A` to which callsigns like `SV1ABC/A` shall match.
+/// Note: While searching for a prefix, next to obvious prefixes like `DL`, there are also speical ones listed like `SV/A`.
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct Prefix {
     /// Identifier
@@ -330,7 +330,7 @@ pub struct InvalidOperations {
 /// Invalid operation.
 ///
 /// An entry represents an invalid operation.
-/// When searching for a matching entry the [callsign](InvalidOperation::call) must match exactly including prefix and suffix.
+/// When searching for a matching entry the [callsign](InvalidOperation::call) must match exactly including prefix, suffix and appendix.
 /// Furthermore, check the validity against the optional [start](InvalidOperation::start) and [end](InvalidOperation::end) timestamps.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename = "Invalid")]
@@ -360,7 +360,7 @@ pub struct ZoneExceptions {
 /// CQ zone exception.
 ///
 /// An entry represents a callsign, where the CQ zone of the entity is different.
-/// When searching for a matching entry the [callsign](ZoneException::call) must match exactly including prefix and suffix.
+/// When searching for a matching entry the [callsign](ZoneException::call) must match exactly including prefix, suffix and appendix.
 /// Furthermore, check the validity against the optional [start](ZoneException::start) and [end](ZoneException::end) timestamps.
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct ZoneException {

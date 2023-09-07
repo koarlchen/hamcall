@@ -22,7 +22,7 @@ pub struct Callsign {
     pub call: String,
     /// Name of entity
     pub dxcc: Option<String>,
-    /// ADIF identifier
+    /// ADIF DXCC identifier
     pub adif: Option<Adif>,
     /// CQ zone
     pub cqzone: Option<CqZone>,
@@ -36,11 +36,11 @@ pub struct Callsign {
 
 impl Callsign {
     /// Check if callsign is assigned to a special entity like /MM, /AM or /SAT.
-    pub fn is_special_entity(&self) -> Option<SpecialEntitySuffix> {
+    pub fn is_special_entity(&self) -> Option<SpecialEntityAppendix> {
         match self.adif {
-            Some(ADIF_ID_MARITIME_MOBILE) => Some(SpecialEntitySuffix::Mm),
-            Some(ADIF_ID_AERONAUTICAL_MOBILE) => Some(SpecialEntitySuffix::Am),
-            Some(ADIF_ID_SATELLITE) => Some(SpecialEntitySuffix::Sat),
+            Some(ADIF_ID_MARITIME_MOBILE) => Some(SpecialEntityAppendix::Mm),
+            Some(ADIF_ID_AERONAUTICAL_MOBILE) => Some(SpecialEntityAppendix::Am),
+            Some(ADIF_ID_SATELLITE) => Some(SpecialEntityAppendix::Sat),
             _ => None,
         }
     }
@@ -122,6 +122,7 @@ pub enum CallsignError {
     #[error("Callsign was used in an invalid operation")]
     InvalidOperation,
 
+    /// Callsign does not begin with a valid prefix
     #[error("Callsign does not begin with a valid prefix")]
     BeginWithoutPrefix,
 
@@ -129,17 +130,17 @@ pub enum CallsignError {
     #[error("Unexpected third prefix")]
     ThirdPrefix,
 
-    /// Multiple single digit suffixes
-    #[error("Multiple single digit suffixes")]
-    MultipleSingleDigitSuffix,
+    /// Multiple single digit appendices
+    #[error("Multiple single digit appendices")]
+    MultipleSingleDigitAppendices,
 
-    /// Multiple special suffixes that indicate not entity
-    #[error("Multiple special suffixes that indicate not entity")]
-    MultipleSpecialSuffix,
+    /// Multiple special appendices that indicate not entity
+    #[error("Multiple special appendices that indicate not entity")]
+    MultipleSpecialAppendices,
 }
 
-/// Special suffixes that may not be interpreted as prefixes
-const SUFFIX_SPECIAL: [&str; 7] = ["AM", "MM", "SAT", "P", "M", "QRP", "LH"];
+/// Special appendices that may not be interpreted as prefixes
+const APPENDIX_SPECIAL: [&str; 7] = ["AM", "MM", "SAT", "P", "M", "QRP", "LH"];
 
 /// Type of split
 #[derive(PartialEq, Eq)]
@@ -163,15 +164,15 @@ struct Element {
 enum State {
     /// No prefix found so far
     NoPrefix,
-    /// Single prefix found, another prefix or suffixes may follow
+    /// Single prefix found, another prefix or appendices may follow
     SinglePrefix,
-    /// Found complete prefix, only suffixes may follow
+    /// Found complete prefix, only appendices may follow
     PrefixComplete(u8),
 }
 
-/// Suffix that indicates that the calls entity may be ignored
+/// Appendix that indicates that the calls entity may be ignored
 #[derive(PartialEq, Eq)]
-pub enum SpecialEntitySuffix {
+pub enum SpecialEntityAppendix {
     /// Maritime Mobile
     Mm,
     /// Aeronautical Mobile
@@ -189,7 +190,7 @@ pub fn check_whitelist(
     timestamp: &DateTime<Utc>,
 ) -> bool {
     // Get entity for adif identifier
-    // Note that not all valid adif identifiers refer to same entity (e.g. aeronautical mobile calls)
+    // Note that not all valid adif identifiers refer to an entity (e.g. aeronautical mobile calls)
     if let Some(entity) = clublog.get_entity(adif, timestamp) {
         // Check if whitelisting is enabled
         if entity.whitelist == Some(true) {
@@ -253,11 +254,11 @@ pub fn analyze_callsign(
     for (pos, part) in parts.iter().enumerate() {
         // TODO: Is the assumption below correct for very special prefixes like SV/A? -> What if SV is not a prefix but SV/A is a valid prefix?
         let pt = if get_prefix(clublog, part, timestamp, &[]).is_some() {
-            // MM and AM may be valid prefixes or special suffixes depending on the position within the complete callsign.
-            // For example MM as a prefix evaluates to Scotland, MM as a suffix indicates a maritime mobile activation.
-            // Special suffixes are only valid as those if they are right at the beginning of the callsign.
-            // Therefore ignore the first element of the call and check for special suffixes beginning from the second element onwards.
-            if pos >= 1 && is_special_suffix(part) {
+            // MM and AM may be valid prefixes or special appendices depending on the position within the complete callsign.
+            // For example MM as a prefix evaluates to Scotland, MM as an appendix indicates a maritime mobile activation.
+            // Special appendices are only valid as those if they are right at the beginning of the callsign.
+            // Therefore ignore the first element of the call and check for special appendices beginning from the second element onwards.
+            if pos >= 1 && is_special_appendix(part) {
                 PartType::Other
             } else {
                 PartType::Prefix
@@ -292,7 +293,7 @@ pub fn analyze_callsign(
     );
 
     // Possible state 1:
-    // The callsign consists of only one part with no prefix nor suffix
+    // The callsign consists of only one part with no prefix nor appendix
     if state == State::SinglePrefix {
         let prefix = get_prefix(clublog, call, timestamp, &[]).unwrap().0;
 
@@ -308,7 +309,7 @@ pub fn analyze_callsign(
     }
 
     // Possible state 2:
-    // The callsign consists of a single prefix and zero or more suffixes
+    // The callsign consists of a single prefix and zero or more appendices
     if state == State::PrefixComplete(1) {
         // Complete homecall
         // Example: W1AW
@@ -320,13 +321,13 @@ pub fn analyze_callsign(
             .unwrap()
             .0;
 
-        // Special suffix like /AM or /MM is present
+        // Special appendix like /AM or /MM is present
         // Example: W1AW/AM
-        if let Some(suffix) = is_no_entity_by_suffix(&elements[1..])? {
-            return Ok(match suffix {
-                SpecialEntitySuffix::Am => Callsign::new_aeronautical_mobile(call),
-                SpecialEntitySuffix::Mm => Callsign::new_maritime_mobile(call),
-                SpecialEntitySuffix::Sat => Callsign::new_satellite(call),
+        if let Some(appendix) = is_no_entity_by_appendix(&elements[1..])? {
+            return Ok(match appendix {
+                SpecialEntityAppendix::Am => Callsign::new_aeronautical_mobile(call),
+                SpecialEntityAppendix::Mm => Callsign::new_maritime_mobile(call),
+                SpecialEntityAppendix::Sat => Callsign::new_satellite(call),
             });
         }
 
@@ -336,10 +337,10 @@ pub fn analyze_callsign(
             return Ok(Callsign::new_maritime_mobile(call));
         }
 
-        // Check if a single digit suffix is present
-        // If so, check if the single digit suffix changes the prefix to a different one
+        // Check if a single digit appendix is present
+        // If so, check if the single digit appendix changes the prefix to a different one
         // Example: "SV0ABC/9" where SV is Greece, but SV9 is Crete
-        if let Some(pref) = is_different_prefix_by_single_digit_suffix(
+        if let Some(pref) = is_different_prefix_by_single_digit_appendix(
             clublog,
             homecall,
             timestamp,
@@ -357,7 +358,7 @@ pub fn analyze_callsign(
     }
 
     // Possible state 3:
-    // The callsign consists of two prefixes and one or more suffixes
+    // The callsign consists of two prefixes and one or more appendices
     if state == State::PrefixComplete(2) {
         // Get prefix information for both prefixes.
         // Decide which one to use by how many characters were removed from the potential prefix before it matched a prefix from the list.
@@ -388,30 +389,30 @@ fn apply_cqzone_exception(clublog: &ClubLog, call: &mut Callsign, timestamp: &Da
     }
 }
 
-/// Check if the list of suffixes contains a suffix with a single digit that may indicate a different prefix.
-/// If there is such single digit suffix replace the digit within the callsign and query information for the new prefix.
+/// Check if the list of appendices contains an appendix with a single digit that may indicate a different prefix.
+/// If there is such single digit appendix replace the digit within the callsign and query information for the new prefix.
 /// Example: "SV0ABC/9" where SV is Greece, but SV9 is Crete
-fn is_different_prefix_by_single_digit_suffix<'a>(
+fn is_different_prefix_by_single_digit_appendix<'a>(
     clublog: &'a ClubLog,
     homecall: &str,
     timestamp: &DateTime<Utc>,
-    suffixes: &[Element],
+    appendices: &[Element],
 ) -> Result<Option<(&'a Prefix, usize)>, CallsignError> {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"^([A-Z0-9]+)(\d)([A-Z0-9]+)$").unwrap();
     }
 
-    // Search for single digits in the list of suffixes
-    let single_digits: Vec<&Element> = suffixes
+    // Search for single digits in the list of appendices
+    let single_digits: Vec<&Element> = appendices
         .iter()
-        .filter(|e| is_single_digit_suffix(&e.part))
+        .filter(|e| is_single_digit_appendix(&e.part))
         .collect();
     match single_digits.len() {
         0 => return Ok(None),
         1 => (),
         _ => {
             // TODO: Should this be treated like an error? Just take the first? Ignore all of them?
-            return Err(CallsignError::MultipleSingleDigitSuffix);
+            return Err(CallsignError::MultipleSingleDigitAppendices);
         }
     }
     let new_digit = &single_digits[0].part;
@@ -419,7 +420,7 @@ fn is_different_prefix_by_single_digit_suffix<'a>(
     // TODO: RE.replace probably not required here, just assemble new call from both capture groups and the new digit like below
     let new_homecall = RE.replace(homecall, format!("${{1}}{}${{3}}", new_digit));
 
-    Ok(get_prefix(clublog, &new_homecall, timestamp, suffixes))
+    Ok(get_prefix(clublog, &new_homecall, timestamp, appendices))
 }
 
 /// Check if the entity named in the prefix indicates a maritime mobile callsign
@@ -432,53 +433,53 @@ fn is_invalid_prefix(prefix: &Prefix) -> bool {
     prefix.entity == PREFIX_INVALID
 }
 
-/// Check if a special suffix is present that indicates that the actual prefix of the call is not relevant.
-/// Such a suffix may for example be MM (maritime mobile).
-fn is_no_entity_by_suffix(
-    suffixes: &[Element],
-) -> Result<Option<SpecialEntitySuffix>, CallsignError> {
-    let s: Vec<&Element> = suffixes
+/// Check if a special appendix is present that indicates that the actual prefix of the call is not relevant.
+/// Such a appendix may for example be MM (maritime mobile).
+fn is_no_entity_by_appendix(
+    appendices: &[Element],
+) -> Result<Option<SpecialEntityAppendix>, CallsignError> {
+    let a: Vec<&Element> = appendices
         .iter()
-        .filter(|e| suffix_indicates_no_entity(&e.part).is_some())
+        .filter(|e| appendix_indicates_no_entity(&e.part).is_some())
         .collect();
 
-    match s.len() {
+    match a.len() {
         0 => Ok(None),
-        1 => Ok(suffix_indicates_no_entity(&s[0].part)),
-        _ => Err(CallsignError::MultipleSpecialSuffix),
+        1 => Ok(appendix_indicates_no_entity(&a[0].part)),
+        _ => Err(CallsignError::MultipleSpecialAppendices),
     }
 }
 
-/// Check if a potential suffix equals a special suffix which requires special treatment of the call prefix.
+/// Check if a potential appendix equals a special appendix which requires special treatment of the call prefix.
 /// For example AM (aeronautical mobile) indicates that the call prefix information may not need to be considered.
-fn suffix_indicates_no_entity(potential_suffix: &str) -> Option<SpecialEntitySuffix> {
-    match potential_suffix {
-        "MM" => Some(SpecialEntitySuffix::Mm),
-        "AM" => Some(SpecialEntitySuffix::Am),
-        "SAT" => Some(SpecialEntitySuffix::Sat),
+fn appendix_indicates_no_entity(potential_appendix: &str) -> Option<SpecialEntityAppendix> {
+    match potential_appendix {
+        "MM" => Some(SpecialEntityAppendix::Mm),
+        "AM" => Some(SpecialEntityAppendix::Am),
+        "SAT" => Some(SpecialEntityAppendix::Sat),
         _ => None,
     }
 }
 
-/// Check if the potential suffix is a special suffix.
-/// See [SUFFIX_SPECIAL].
-fn is_special_suffix(potential_suffix: &str) -> bool {
-    SUFFIX_SPECIAL.contains(&potential_suffix)
+/// Check if the potential appendix is a special appendix
+/// See [APPENDIX_SPECIAL].
+fn is_special_appendix(potential_appendix: &str) -> bool {
+    APPENDIX_SPECIAL.contains(&potential_appendix)
 }
 
-/// Check if the potential suffix is a single digit suffix
-fn is_single_digit_suffix(potential_suffix: &str) -> bool {
-    if potential_suffix.len() == 1 {
-        potential_suffix.chars().next().unwrap().is_numeric()
+/// Check if the potential appendix is a single digit appendix
+fn is_single_digit_appendix(potential_appendix: &str) -> bool {
+    if potential_appendix.len() == 1 {
+        potential_appendix.chars().next().unwrap().is_numeric()
     } else {
         false
     }
 }
 
-/// Check if the potential suffix is a single char suffix
-fn is_single_char_suffix(potential_suffix: &str) -> bool {
-    if potential_suffix.len() == 1 {
-        potential_suffix.chars().next().unwrap().is_alphabetic()
+/// Check if the potential appendix is a single char appendix
+fn is_single_char_appendix(potential_appendix: &str) -> bool {
+    if potential_appendix.len() == 1 {
+        potential_appendix.chars().next().unwrap().is_alphabetic()
     } else {
         false
     }
@@ -486,22 +487,22 @@ fn is_single_char_suffix(potential_suffix: &str) -> bool {
 
 /// Search for a matching prefix by brutforcing all possibilities.
 /// The potential prefix will be shortened char by char from the back until a prefix matches.
-/// Furthermore, to take in account of prefixes like SV/A, append all single char suffixes to the end of the potential prefix before checking for a match.
+/// Furthermore, to take in account of prefixes like SV/A, append all single char appendices to the end of the potential prefix before checking for a match.
 /// Next to the prefix information the number of removed chars is returned.
 fn get_prefix<'a>(
     clublog: &'a ClubLog,
     potential_prefix: &str,
     timestamp: &DateTime<Utc>,
-    suffixes: &[Element],
+    appendices: &[Element],
 ) -> Option<(&'a Prefix, usize)> {
     let len_potential_prefix = potential_prefix.len();
     assert!(len_potential_prefix >= 1);
 
-    // Search for single char suffixes
+    // Search for single char appendices
     // For example SV/A is a valid prefix but indicates a different entity as the prefix SV
-    let single_char_suffixes: Vec<&Element> = suffixes
+    let single_char_appendices: Vec<&Element> = appendices
         .iter()
-        .filter(|e| is_single_char_suffix(&e.part))
+        .filter(|e| is_single_char_appendix(&e.part))
         .collect::<Vec<&Element>>();
 
     // Bruteforce all possibilities
@@ -512,10 +513,11 @@ fn get_prefix<'a>(
         // Shortened call
         let slice = &potential_prefix[0..cnt];
 
-        // Append all single chars to the call as <call>/<suffix> and check if the prefix is valid
+        // Append all single chars to the call as <call>/<appendix> and check if the prefix is valid
         // This check is required for prefixes like SV/A where the callsign SV1ABC/A shall match to
-        for suffix in &single_char_suffixes {
-            if let Some(pref) = clublog.get_prefix(&format!("{}/{}", slice, suffix.part), timestamp)
+        for appendix in &single_char_appendices {
+            if let Some(pref) =
+                clublog.get_prefix(&format!("{}/{}", slice, appendix.part), timestamp)
             {
                 prefix = Some((pref, len_potential_prefix - cnt));
                 break;
@@ -571,7 +573,7 @@ mod tests {
     }
 
     #[test]
-    fn clublog_special_suffix() {
+    fn clublog_special_appendix() {
         let calls = vec![
             ("EL0ABC", "2020-01-01T00:00:00Z", ADIF_ID_MARITIME_MOBILE), // test for prefix record 7069
             (
@@ -620,7 +622,7 @@ mod tests {
     }
 
     #[test]
-    fn special_suffix_am() {
+    fn special_appendix_am() {
         let calls = vec!["W1AW/AM", "W1AM/P/AM", "W1AW/AM/P", "W1AW/P/AM/7"];
 
         let clublog = read_clublog_xml();
@@ -639,7 +641,7 @@ mod tests {
     }
 
     #[test]
-    fn special_suffix_mm() {
+    fn special_appendix_mm() {
         let calls = vec!["W1AW/MM", "W1AM/P/MM", "W1AW/MM/P", "W1AW/P/MM/7"];
 
         let clublog = read_clublog_xml();
@@ -658,7 +660,7 @@ mod tests {
     }
 
     #[test]
-    fn special_suffix_sat() {
+    fn special_appendix_sat() {
         let calls = vec!["W1AW/SAT", "W1AM/P/SAT", "W1AW/SAT/P", "W1AW/P/SAT/7"];
 
         let clublog = read_clublog_xml();
