@@ -16,9 +16,7 @@ pub fn main() {
         let info = clublog.get_prefix(&args[2], &Utc::now().into()).unwrap();
         println!("Prefix information:\n{:?}", info);
 
-        if let Some(adif) = info.adif {
-            let entity = clublog.get_entity(adif, &Utc::now().into());
-            println!("Entity information:\n{:?}", entity);
-        }
+        let entity = clublog.get_entity(info.adif, &Utc::now().into());
+        println!("Entity information:\n{:?}", entity);
     }
 }

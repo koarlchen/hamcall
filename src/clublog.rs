@@ -20,9 +20,6 @@ pub type CqZone = u8;
 /// Record identifier
 pub type RecordId = u16;
 
-/// Special value for the entity of an invalid prefix
-pub const PREFIX_INVALID: &str = "INVALID";
-
 /// Special value for the entity of a prefix that is used maritime mobile
 pub const PREFIX_MARITIME_MOBILE: &str = "MARITIME MOBILE";
 
@@ -32,14 +29,8 @@ pub const CALLSIGN_EXCEPTION_AERONAUTICAL_MOBILE: &str = "AERONAUTICAL MOBILE";
 /// Special value for the entity of a callsign exception that is satellite, internet or repeater only
 pub const CALLSIGN_EXCEPTION_SATELLITE: &str = "SATELLITE, INTERNET OR REPEATER";
 
-/// ADIF identifier for maritime mobile (Important: clublog lists no prefix for /MM)
-pub const ADIF_ID_MARITIME_MOBILE: Adif = 999;
-
-/// ADIF identifier for aeronautical mobile
-pub const ADIF_ID_AERONAUTICAL_MOBILE: Adif = 998;
-
-/// ADIF identifier for satellite, internet or repeater
-pub const ADIF_ID_SATELLITE: Adif = 997;
+/// Special ADIF identifier representing an unknown entity
+pub const ADIF_ID_NO_DXCC: Adif = 0;
 
 /// Errors
 #[derive(Debug)]
@@ -147,9 +138,6 @@ pub struct ClubLog {
     #[serde(deserialize_with = "parse_datetime")]
     #[serde(rename = "@date")]
     pub date: DateTime<Utc>,
-    /// XML namespace
-    #[serde(rename = "@xmlns")]
-    pub xmlns: String,
     /// List of entities
     pub entities: Entities,
     /// List of callsign exceptions
@@ -195,13 +183,13 @@ pub struct Entity {
     /// Entity deleted after [end](Entity::end)
     pub deleted: bool,
     /// CQ zone
-    pub cqz: CqZone,
+    pub cqz: Option<CqZone>,
     /// Continent
-    pub cont: String,
+    pub cont: Option<String>,
     /// Longitude
-    pub long: f32,
+    pub long: Option<f32>,
     /// Latitude
-    pub lat: f32,
+    pub lat: Option<f32>,
     /// Start timestamp of validity
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
@@ -256,13 +244,13 @@ pub struct CallsignException {
     /// ADIF identifier
     pub adif: Adif,
     /// CQ zone
-    pub cqz: CqZone,
+    pub cqz: Option<CqZone>,
     /// Continent
-    pub cont: String,
+    pub cont: Option<String>,
     /// Longitude
-    pub long: f32,
+    pub long: Option<f32>,
     /// Latitude
-    pub lat: f32,
+    pub lat: Option<f32>,
     /// Start timestamp of validity
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
@@ -301,7 +289,7 @@ pub struct Prefix {
     /// Name of entity
     pub entity: String,
     /// ADIF identifier
-    pub adif: Option<Adif>,
+    pub adif: Adif,
     /// CQ zone
     pub cqz: Option<CqZone>,
     /// Continent
@@ -400,8 +388,6 @@ mod tests {
     fn check_parser() {
         let clublog = read_clublog_xml();
 
-        assert!(!clublog.xmlns.is_empty());
-
         assert!(clublog.entities.list.len() > 0);
         assert!(clublog.exceptions.list.len() > 0);
         assert!(clublog.prefixes.list.len() > 0);
@@ -420,7 +406,7 @@ mod tests {
                     .into(),
             )
             .unwrap();
-        assert_eq!(info.adif, Some(230));
+        assert_eq!(info.adif, 230);
     }
 
     #[test]
@@ -443,8 +429,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(y1.adif, Some(229));
-        assert_eq!(y2.adif, Some(230));
+        assert_eq!(y1.adif, 229);
+        assert_eq!(y2.adif, 230);
     }
 
     #[test]

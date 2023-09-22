@@ -7,8 +7,7 @@
 //! The example `call.rs` shows the basic usage of this module.
 
 use crate::clublog::{
-    Adif, CallsignException, ClubLog, CqZone, Prefix, ADIF_ID_AERONAUTICAL_MOBILE,
-    ADIF_ID_MARITIME_MOBILE, ADIF_ID_SATELLITE, PREFIX_INVALID, PREFIX_MARITIME_MOBILE,
+    Adif, CallsignException, ClubLog, CqZone, Prefix, ADIF_ID_NO_DXCC, PREFIX_MARITIME_MOBILE,
 };
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
@@ -36,12 +35,11 @@ pub struct Callsign {
 
 impl Callsign {
     /// Check if callsign is assigned to a special entity like /MM, /AM or /SAT.
-    pub fn is_special_entity(&self) -> Option<SpecialEntityAppendix> {
-        match self.adif {
-            Some(ADIF_ID_MARITIME_MOBILE) => Some(SpecialEntityAppendix::Mm),
-            Some(ADIF_ID_AERONAUTICAL_MOBILE) => Some(SpecialEntityAppendix::Am),
-            Some(ADIF_ID_SATELLITE) => Some(SpecialEntityAppendix::Sat),
-            _ => None,
+    pub fn is_special_entity(&self) -> bool {
+        if let Some(adif) = self.adif {
+            adif == ADIF_ID_NO_DXCC
+        } else {
+            false
         }
     }
 
@@ -50,7 +48,7 @@ impl Callsign {
         Callsign {
             call: String::from(call),
             dxcc: None,
-            adif: Some(ADIF_ID_MARITIME_MOBILE),
+            adif: Some(ADIF_ID_NO_DXCC),
             cqzone: None,
             continent: None,
             longitude: None,
@@ -63,7 +61,7 @@ impl Callsign {
         Callsign {
             call: String::from(call),
             dxcc: None,
-            adif: Some(ADIF_ID_AERONAUTICAL_MOBILE),
+            adif: Some(ADIF_ID_NO_DXCC),
             cqzone: None,
             continent: None,
             longitude: None,
@@ -76,7 +74,7 @@ impl Callsign {
         Callsign {
             call: String::from(call),
             dxcc: None,
-            adif: Some(ADIF_ID_SATELLITE),
+            adif: Some(ADIF_ID_NO_DXCC),
             cqzone: None,
             continent: None,
             longitude: None,
@@ -89,7 +87,7 @@ impl Callsign {
         Callsign {
             call: String::from(call),
             dxcc: Some(prefix.entity.clone()),
-            adif: prefix.adif,
+            adif: Some(prefix.adif),
             cqzone: prefix.cqz,
             continent: prefix.cont.clone(),
             longitude: prefix.long,
@@ -103,10 +101,10 @@ impl Callsign {
             call: String::from(call),
             dxcc: Some(exc.entity.clone()),
             adif: Some(exc.adif),
-            cqzone: Some(exc.cqz),
-            continent: Some(exc.cont.clone()),
-            longitude: Some(exc.long),
-            latitude: Some(exc.lat),
+            cqzone: exc.cqz,
+            continent: exc.cont.clone(),
+            longitude: exc.long,
+            latitude: exc.lat,
         }
     }
 }
@@ -428,11 +426,6 @@ fn is_mm_entity(prefix: &Prefix) -> bool {
     prefix.entity == PREFIX_MARITIME_MOBILE
 }
 
-/// Check if the entity named in the prefix indicates an invalid operation
-fn is_invalid_prefix(prefix: &Prefix) -> bool {
-    prefix.entity == PREFIX_INVALID
-}
-
 /// Check if a special appendix is present that indicates that the actual prefix of the call is not relevant.
 /// Such a appendix may for example be MM (maritime mobile).
 fn is_no_entity_by_appendix(
@@ -529,9 +522,7 @@ fn get_prefix<'a>(
 
         // Check if prefix is valid
         if let Some(pref) = clublog.get_prefix(slice, timestamp) {
-            if !is_invalid_prefix(pref) {
-                prefix = Some((pref, len_potential_prefix - cnt));
-            }
+            prefix = Some((pref, len_potential_prefix - cnt));
             break;
         }
     }
@@ -575,13 +566,8 @@ mod tests {
     #[test]
     fn clublog_special_appendix() {
         let calls = vec![
-            ("EL0ABC", "2020-01-01T00:00:00Z", ADIF_ID_MARITIME_MOBILE), // test for prefix record 7069
-            (
-                "KB5SIW/STS50",
-                "2020-01-01T00:00:00Z",
-                ADIF_ID_AERONAUTICAL_MOBILE,
-            ), // test for call exception record 2730
-            ("ZY0RK", "1994-08-20T00:00:00Z", ADIF_ID_SATELLITE), // test for callsign exception record 28169
+            ("KB5SIW/STS50", "2020-01-01T00:00:00Z"), // test for call exception record 2730
+            ("ZY0RK", "1994-08-20T00:00:00Z"),        // test for callsign exception record 28169
         ];
 
         let clublog = read_clublog_xml();
@@ -594,7 +580,7 @@ mod tests {
             )
             .unwrap();
 
-            assert_eq!(res.adif.unwrap(), call.2);
+            assert_eq!(res.adif.unwrap(), ADIF_ID_NO_DXCC);
         }
     }
 
@@ -636,7 +622,7 @@ mod tests {
                     .into(),
             )
             .unwrap();
-            assert_eq!(res.adif.unwrap(), ADIF_ID_AERONAUTICAL_MOBILE);
+            assert_eq!(res.adif.unwrap(), ADIF_ID_NO_DXCC);
         }
     }
 
@@ -655,7 +641,7 @@ mod tests {
                     .into(),
             )
             .unwrap();
-            assert_eq!(res.adif.unwrap(), ADIF_ID_MARITIME_MOBILE);
+            assert_eq!(res.adif.unwrap(), ADIF_ID_NO_DXCC);
         }
     }
 
@@ -674,7 +660,7 @@ mod tests {
                     .into(),
             )
             .unwrap();
-            assert_eq!(res.adif.unwrap(), ADIF_ID_SATELLITE);
+            assert_eq!(res.adif.unwrap(), ADIF_ID_NO_DXCC);
         }
     }
 
