@@ -166,7 +166,7 @@ enum State {
 
 /// Appendix that indicates that the calls entity may be ignored
 #[derive(PartialEq, Eq)]
-pub enum SpecialEntityAppendix {
+enum SpecialEntityAppendix {
     /// Maritime Mobile
     Mm,
     /// Aeronautical Mobile
