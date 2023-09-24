@@ -14,7 +14,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use thiserror::Error;
 
-/// Callsign
+/// Representation of a callsign together with detailed information like the name of the entity or ADIF DXCC identifier.
 #[derive(Debug, PartialEq)]
 pub struct Callsign {
     /// Complete callsign
@@ -180,7 +180,9 @@ pub enum SpecialEntityAppendix {
 }
 
 /// Check if the callsign is whitelisted if the whitelist option is enabled for the entity of the callsign at the given point in time.
-/// Returns true if the callsign is valid, false if whitelisting for that entity is enabled and the callsign is not on the whitelist.
+///
+/// Returns true if the callsign is valid or false if whitelisting for that entity is enabled and the callsign is not on the whitelist.
+/// This function does not check for the general validity of that callsign. You probably want to use [analyze_callsign] beforehand.
 pub fn check_whitelist(
     clublog: &ClubLog,
     call: &str,
@@ -219,7 +221,7 @@ pub fn check_whitelist(
     true
 }
 
-/// Analyze callsign to get further information.
+/// Analyze callsign to get further information like the name of the entity or the AIDF DXCC identifier.
 pub fn analyze_callsign(
     clublog: &ClubLog,
     call: &str,
@@ -587,7 +589,7 @@ mod tests {
     #[test]
     fn clublog_whitelist() {
         let calls = vec![
-            ("KH4AB", 174, "1975-01-01T00:00:00Z", true), // Timestamp before start of whitelist
+            ("KH4AB", 174, "1975-01-01T00:00:00Z", true), // Timestamp before start of whitelist (note: prefix would be invalid, but that check is by design not part of the tested function)
             ("KH4AB", 174, "1981-01-01T00:00:00Z", false), // Timestamp after start of whitelist and call not part of exception list
             ("KH4AB", 174, "1980-04-07T00:00:00Z", true), // Timestamp after start of whitelist and call is part of exception list
             ("KH4AB", 174, "1983-01-02T00:00:00Z", false), // Timestamp after start of whitelist, call is part of exception list but with different adif identifier
