@@ -12,7 +12,7 @@ Apparently, the files are not versioned except for the timestamp within the `cty
 On how to obtain a `cty.xml` or rather an API key just have a look at the ClubLog website.
 
 Analyzing callsigns is not that easy.
-Next to obvious callsigs like `DL1ABC` or `F/DL1ABC` there are also tricky ones like `SV1DC/A` (SV/A is Mount Athos, SV is Greece. This exact callsign is valid for Mount Athos, but for example `SV1ABC/A` does not have to be Mount Athos), `CE0Y/PG5M` (which of both parts is the prefix?) or `F0BAU/FC` (prefix is in the back!).
+Next to obvious callsigns like `DL1ABC` or `F/DL1ABC` there are also tricky ones like `SV1DC/A` (SV/A is Mount Athos, SV is Greece. This exact callsign is valid for Mount Athos, but for example `SV1ABC/A` does not have to be Mount Athos), `CE0Y/PG5M` (which of both parts is the prefix?) or `F0BAU/FC` (prefix is in the back!).
 The given implementation should handle quite a few of those calls but will never be assumed to analyze all callsigns, especially the quite special ones, correctly.
 For example, `LS4AA/F` counts for Argentina, even though the additional `/F` indicates France.
 Such calls cannot be covered by using solely the ClubLog XML data.
