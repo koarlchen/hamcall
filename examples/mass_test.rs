@@ -22,19 +22,17 @@ pub fn main() {
         for entry in csv {
             match call::analyze_callsign(&clublog, &entry.0, &entry.2) {
                 Ok(c) => {
-                    if let Some(adif) = c.adif {
-                        if entry.1 != adif {
-                            let entity_theirs = &clublog
-                                .get_entity(entry.1, &entry.2)
-                                .map_or("", |e| &e.name);
-                            let entity_mine =
-                                &clublog.get_entity(adif, &entry.2).map_or("", |e| &e.name);
-                            eprintln!(
-                                "{} => ADIF mismatch (theirs={} ({:?}) != mine={} ({:?}))",
-                                entry.0, entry.1, entity_theirs, adif, entity_mine
-                            );
-                            continue;
-                        }
+                    if entry.1 != c.adif {
+                        let entity_theirs = &clublog
+                            .get_entity(entry.1, &entry.2)
+                            .map_or("", |e| &e.name);
+                        let entity_mine =
+                            &clublog.get_entity(c.adif, &entry.2).map_or("", |e| &e.name);
+                        eprintln!(
+                            "{} => ADIF mismatch (theirs={} ({:?}) != mine={} ({:?}))",
+                            entry.0, entry.1, entity_theirs, c.adif, entity_mine
+                        );
+                        continue;
                     }
                     println!("{} => {:?}", entry.0, c);
                 }

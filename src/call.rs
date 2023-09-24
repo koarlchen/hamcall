@@ -19,10 +19,10 @@ use thiserror::Error;
 pub struct Callsign {
     /// Complete callsign
     pub call: String,
+    /// ADIF DXCC identifier
+    pub adif: Adif,
     /// Name of entity
     pub dxcc: Option<String>,
-    /// ADIF DXCC identifier
-    pub adif: Option<Adif>,
     /// CQ zone
     pub cqzone: Option<CqZone>,
     /// Continent
@@ -34,21 +34,17 @@ pub struct Callsign {
 }
 
 impl Callsign {
-    /// Check if callsign is assigned to a special entity like /MM, /AM or /SAT.
+    /// Check if callsign is assigned to no DXCC (like for /AM, /MM or /SAT)
     pub fn is_special_entity(&self) -> bool {
-        if let Some(adif) = self.adif {
-            adif == ADIF_ID_NO_DXCC
-        } else {
-            false
-        }
+        self.adif == ADIF_ID_NO_DXCC
     }
 
     /// Instantiate a new maritime mobile callsign
     fn new_maritime_mobile(call: &str) -> Callsign {
         Callsign {
             call: String::from(call),
+            adif: ADIF_ID_NO_DXCC,
             dxcc: None,
-            adif: Some(ADIF_ID_NO_DXCC),
             cqzone: None,
             continent: None,
             longitude: None,
@@ -60,8 +56,8 @@ impl Callsign {
     fn new_aeronautical_mobile(call: &str) -> Callsign {
         Callsign {
             call: String::from(call),
+            adif: ADIF_ID_NO_DXCC,
             dxcc: None,
-            adif: Some(ADIF_ID_NO_DXCC),
             cqzone: None,
             continent: None,
             longitude: None,
@@ -73,8 +69,8 @@ impl Callsign {
     fn new_satellite(call: &str) -> Callsign {
         Callsign {
             call: String::from(call),
+            adif: ADIF_ID_NO_DXCC,
             dxcc: None,
-            adif: Some(ADIF_ID_NO_DXCC),
             cqzone: None,
             continent: None,
             longitude: None,
@@ -86,8 +82,8 @@ impl Callsign {
     fn from_prefix(call: &str, prefix: &Prefix) -> Callsign {
         Callsign {
             call: String::from(call),
+            adif: prefix.adif,
             dxcc: Some(prefix.entity.clone()),
-            adif: Some(prefix.adif),
             cqzone: prefix.cqz,
             continent: prefix.cont.clone(),
             longitude: prefix.long,
@@ -99,8 +95,8 @@ impl Callsign {
     fn from_exception(call: &str, exc: &CallsignException) -> Callsign {
         Callsign {
             call: String::from(call),
+            adif: exc.adif,
             dxcc: Some(exc.entity.clone()),
-            adif: Some(exc.adif),
             cqzone: exc.cqz,
             continent: exc.cont.clone(),
             longitude: exc.long,
@@ -560,7 +556,6 @@ mod tests {
                     .unwrap()
                     .into(),
             );
-
             assert_eq!(res, Err(CallsignError::BeginWithoutPrefix));
         }
     }
@@ -581,8 +576,7 @@ mod tests {
                 &DateTime::parse_from_rfc3339(call.1).unwrap().into(),
             )
             .unwrap();
-
-            assert_eq!(res.adif.unwrap(), ADIF_ID_NO_DXCC);
+            assert!(res.is_special_entity());
         }
     }
 
@@ -624,7 +618,7 @@ mod tests {
                     .into(),
             )
             .unwrap();
-            assert_eq!(res.adif.unwrap(), ADIF_ID_NO_DXCC);
+            assert!(res.is_special_entity());
         }
     }
 
@@ -643,7 +637,7 @@ mod tests {
                     .into(),
             )
             .unwrap();
-            assert_eq!(res.adif.unwrap(), ADIF_ID_NO_DXCC);
+            assert!(res.is_special_entity());
         }
     }
 
@@ -662,7 +656,7 @@ mod tests {
                     .into(),
             )
             .unwrap();
-            assert_eq!(res.adif.unwrap(), ADIF_ID_NO_DXCC);
+            assert!(res.is_special_entity());
         }
     }
 
@@ -682,7 +676,7 @@ mod tests {
                 &DateTime::parse_from_rfc3339(call.1).unwrap().into(),
             )
             .unwrap();
-            assert_eq!(res.adif.unwrap(), call.2);
+            assert_eq!(res.adif, call.2);
         }
     }
 
@@ -722,7 +716,7 @@ mod tests {
                 &DateTime::parse_from_rfc3339(call.1).unwrap().into(),
             )
             .unwrap();
-            assert_eq!(res.adif.unwrap(), call.2);
+            assert_eq!(res.adif, call.2);
         }
     }
 
@@ -758,7 +752,7 @@ mod tests {
                     .into(),
             )
             .unwrap();
-            assert_eq!(res.adif.unwrap(), call.1);
+            assert_eq!(res.adif, call.1);
         }
     }
 }
