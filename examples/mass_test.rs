@@ -34,6 +34,14 @@ pub fn main() {
                         );
                         continue;
                     }
+                    if !call::check_whitelist(&clublog, &entry.0, c.adif, &entry.2) {
+                        eprintln!(
+                            "{} => Callsign matches to entity {} but is not whitelisted",
+                            &entry.0,
+                            c.dxcc.unwrap()
+                        );
+                        continue;
+                    }
                     println!("{} => {:?}", entry.0, c);
                 }
                 Err(e) => eprintln!("{} => {:?}", entry.0, e),

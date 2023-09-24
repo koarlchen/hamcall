@@ -15,8 +15,19 @@ pub fn main() {
         let raw = fs::read_to_string(file).unwrap();
         let clublog = hamcall::clublog::ClubLog::parse(&raw).unwrap();
 
-        match hamcall::call::analyze_callsign(&clublog, call, &Utc::now()) {
-            Ok(c) => println!("{} => {:?}", call, c),
+        let timestamp = Utc::now();
+
+        match hamcall::call::analyze_callsign(&clublog, call, &timestamp) {
+            Ok(c) => {
+                if hamcall::call::check_whitelist(&clublog, call, c.adif, &timestamp) {
+                    println!("{} => {:?}", call, c)
+                } else {
+                    println!(
+                        "Callsign matches to entity {} but is not whitelisted",
+                        c.dxcc.unwrap()
+                    )
+                }
+            }
             Err(e) => eprintln!("{} => {:?}", call, e),
         }
     }
