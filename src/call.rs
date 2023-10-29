@@ -120,9 +120,9 @@ pub enum CallsignError {
     #[error("Callsign does not begin with a valid prefix")]
     BeginWithoutPrefix,
 
-    /// Unexpected third prefix
-    #[error("Unexpected third prefix")]
-    ThirdPrefix,
+    /// Too much prefixes
+    #[error("Too much prefixes")]
+    TooMuchPrefixes,
 
     /// Multiple special appendices that indicate not entity
     #[error("Multiple special appendices that indicate not entity")]
@@ -142,12 +142,14 @@ enum PartType {
 }
 
 /// State of the call element classification statemachine
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 enum State {
     /// No prefix found so far
     NoPrefix,
-    /// Single prefix found, another prefix or appendices may follow
+    /// Single prefix
     SinglePrefix,
+    /// Double prefix
+    DoublePrefix,
     /// Found complete prefix, only appendices may follow
     PrefixComplete(u8),
 }
@@ -270,111 +272,104 @@ pub fn analyze_callsign(
         match (&state, parttype) {
             (State::NoPrefix, PartType::Prefix) => state = State::SinglePrefix,
             (State::NoPrefix, PartType::Other) => Err(CallsignError::BeginWithoutPrefix)?,
-            (State::SinglePrefix, PartType::Prefix) => state = State::PrefixComplete(2),
+            (State::SinglePrefix, PartType::Prefix) => state = State::DoublePrefix,
             (State::SinglePrefix, PartType::Other) => state = State::PrefixComplete(1),
-            (State::PrefixComplete(_), PartType::Prefix) => Err(CallsignError::ThirdPrefix)?,
+            (State::DoublePrefix, PartType::Prefix) => state = State::PrefixComplete(3),
+            (State::DoublePrefix, PartType::Other) => state = State::PrefixComplete(2),
+            (State::PrefixComplete(_), PartType::Prefix) => Err(CallsignError::TooMuchPrefixes)?,
             (State::PrefixComplete(_), PartType::Other) => (),
         }
     }
 
-    assert!(
-        state == State::PrefixComplete(1)
-            || state == State::PrefixComplete(2)
-            || state == State::SinglePrefix
-    );
-
     // ### Step 5 ###
+    match state {
+        // The callsign consists of a single prefix and zero or more appendices
+        State::SinglePrefix | State::PrefixComplete(1) => {
+            // Complete homecall
+            // Example: W1AW
+            let homecall = &parts[0];
 
-    // Possible state 1:
-    // The callsign consists of only one part with no prefix nor appendix
-    if state == State::SinglePrefix {
-        let prefix = get_prefix(clublog, call, timestamp, &[]).unwrap().0;
+            // Prefix of the homecall
+            // Example: W for the homecall W1AW
+            let homecall_prefix = get_prefix(clublog, homecall, timestamp, &parts[1..])
+                .unwrap()
+                .0;
 
-        let res = if is_mm_entity(prefix) {
-            Callsign::new_maritime_mobile(call)
-        } else {
-            let mut callsign = Callsign::from_prefix(call, prefix);
+            // Special appendix like /AM or /MM is present
+            // Example: W1AW/AM
+            if let Some(appendix) = is_no_entity_by_appendix(&parts[1..])? {
+                return Ok(match appendix {
+                    SpecialEntityAppendix::Am => Callsign::new_aeronautical_mobile(call),
+                    SpecialEntityAppendix::Mm => Callsign::new_maritime_mobile(call),
+                    SpecialEntityAppendix::Sat => Callsign::new_satellite(call),
+                });
+            }
+
+            // Entity name referenced in prefix is /MM
+            // Example: prefix record 7069
+            if is_mm_entity(homecall_prefix) {
+                return Ok(Callsign::new_maritime_mobile(call));
+            }
+
+            // Check if a single digit appendix is present
+            // If so, check if the single digit appendix changes the prefix to a different one
+            // Example: "SV0ABC/9" where SV is Greece, but SV9 is Crete
+            if let Some(pref) = is_different_prefix_by_single_digit_appendix(
+                clublog,
+                homecall,
+                timestamp,
+                &parts[1..],
+            )? {
+                let mut callsign = Callsign::from_prefix(call, pref.0);
+                apply_cqzone_exception(clublog, &mut callsign, timestamp);
+                return Ok(callsign);
+            }
+
+            // No special rule matched, just return information
+            let mut callsign = Callsign::from_prefix(call, homecall_prefix);
             apply_cqzone_exception(clublog, &mut callsign, timestamp);
-            callsign
-        };
-
-        return Ok(res);
-    }
-
-    // Possible state 2:
-    // The callsign consists of a single prefix and zero or more appendices
-    if state == State::PrefixComplete(1) {
-        // Complete homecall
-        // Example: W1AW
-        let homecall = &parts[0];
-
-        // Prefix of the homecall
-        // Example: W for the homecall W1AW
-        let homecall_prefix = get_prefix(clublog, homecall, timestamp, &parts[1..])
-            .unwrap()
-            .0;
-
-        // Special appendix like /AM or /MM is present
-        // Example: W1AW/AM
-        if let Some(appendix) = is_no_entity_by_appendix(&parts[1..])? {
-            return Ok(match appendix {
-                SpecialEntityAppendix::Am => Callsign::new_aeronautical_mobile(call),
-                SpecialEntityAppendix::Mm => Callsign::new_maritime_mobile(call),
-                SpecialEntityAppendix::Sat => Callsign::new_satellite(call),
-            });
+            Ok(callsign)
         }
+        // The callsign consists of two prefixes and zero or more appendices
+        State::DoublePrefix | State::PrefixComplete(2) => {
+            // Get prefix information for both prefixes.
+            let pref_first = get_prefix(clublog, parts[0], timestamp, &parts[1..]).unwrap();
+            let pref_second = get_prefix(clublog, parts[1], timestamp, &parts[2..]).unwrap();
 
-        // Entity name referenced in prefix is /MM
-        // Example: prefix record 7069
-        if is_mm_entity(homecall_prefix) {
-            return Ok(Callsign::new_maritime_mobile(call));
-        }
-
-        // Check if a single digit appendix is present
-        // If so, check if the single digit appendix changes the prefix to a different one
-        // Example: "SV0ABC/9" where SV is Greece, but SV9 is Crete
-        if let Some(pref) =
-            is_different_prefix_by_single_digit_appendix(clublog, homecall, timestamp, &parts[1..])?
-        {
-            let mut callsign = Callsign::from_prefix(call, pref.0);
-            apply_cqzone_exception(clublog, &mut callsign, timestamp);
-            return Ok(callsign);
-        }
-
-        // No special rule matched, just return information
-        let mut callsign = Callsign::from_prefix(call, homecall_prefix);
-        apply_cqzone_exception(clublog, &mut callsign, timestamp);
-        return Ok(callsign);
-    }
-
-    // Possible state 3:
-    // The callsign consists of two prefixes and one or more appendices
-    if state == State::PrefixComplete(2) {
-        // Get prefix information for both prefixes.
-        let pref_first = get_prefix(clublog, parts[0], timestamp, &parts[1..]).unwrap();
-        let pref_second = get_prefix(clublog, parts[1], timestamp, &parts[2..]).unwrap();
-
-        // Check if the first prefix may be a valid special prefix like 3D2/R
-        // Example: "3D2ABC/R" contains two valid prefixes at first sight, 3D2 and R but the first and second prefix together form the special prefix 3D2/R
-        let pref = if pref_first.0.call.contains("/") {
-            pref_first.0
-        } else {
-            // Decide which one to use by how many characters were removed from the potential prefix before it matched a prefix from the list.
-            // The prefix which required less character removals wins.
-            // This is probably not 100% correct, but seems good enough.
-            if pref_first.1 <= pref_second.1 {
+            // Check if the first prefix may be a valid special prefix like 3D2/R
+            // Example: "3D2ABC/R" contains two valid prefixes at first sight, 3D2 and R but the first and second prefix together form the special prefix 3D2/R
+            let pref = if pref_first.0.call.contains('/') {
                 pref_first.0
             } else {
-                pref_second.0
+                // Decide which one to use by how many characters were removed from the potential prefix before it matched a prefix from the list.
+                // The prefix which required less character removals wins.
+                // This is probably not 100% correct, but seems good enough.
+                if pref_first.1 <= pref_second.1 {
+                    pref_first.0
+                } else {
+                    pref_second.0
+                }
+            };
+
+            let mut callsign = Callsign::from_prefix(call, pref);
+            apply_cqzone_exception(clublog, &mut callsign, timestamp);
+            Ok(callsign)
+        }
+        // The callsign consists out of three prefixes and zero or more appendices
+        // This is a very special case and only takes account of calls with a special prefix like 3D2/R and therefore callsigns like 3D2/W1ABC/R.
+        // This call contains three potential valid prefixes 3D2, W and R but 3D2/R is the actual prefix (according to my understanding of the special prefix annotation)
+        State::PrefixComplete(3) => {
+            let pref = get_prefix(clublog, parts[0], timestamp, &parts[1..]).unwrap();
+            if pref.0.call.contains('/') {
+                let mut callsign = Callsign::from_prefix(call, pref.0);
+                apply_cqzone_exception(clublog, &mut callsign, timestamp);
+                Ok(callsign)
+            } else {
+                Err(CallsignError::TooMuchPrefixes)
             }
-        };
-
-        let mut callsign = Callsign::from_prefix(call, pref);
-        apply_cqzone_exception(clublog, &mut callsign, timestamp);
-        return Ok(callsign);
+        }
+        _ => panic!("Internal error"),
     }
-
-    panic!("Should not end here");
 }
 
 /// Update CQ zone of callsign if a zone exception is present
@@ -659,10 +654,10 @@ mod tests {
     #[test]
     fn special_entity_prefix() {
         let calls = vec![
-            ("SV1ABC/A", "2020-01-01T00:00:00Z", 180), // Prefix SV/A
-            ("SV2/W1AW/A", "2020-01-01T00:00:00Z", 180), // Prefix SV/A
+            ("SV1ABC/A", "2020-01-01T00:00:00Z", 180),    // Prefix SV/A
+            ("SV2/W1AW/A", "2020-01-01T00:00:00Z", 180),  // Prefix SV/A
             ("3D2ABC/R", "2020-01-01T00:00:00Z", 460), // Prefix 3D2/R, where 3D2 and R are potential valid prefixes too
-            // ("3D2/W1AW/R", "2020-01-01T00:00:00Z", 460), // Prefix 3D2/R, where 3D2 and R are potential valid prefixes too. FIXME: potential three valid prefixes
+            ("3D2/W1ABC/R", "2020-01-01T00:00:00Z", 460), // Prefix 3D2/R, where 3D2 and R are potential valid prefixes too
         ];
 
         let clublog = read_clublog_xml();
