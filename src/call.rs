@@ -145,14 +145,6 @@ enum PartType {
     Other,
 }
 
-/// Part of a callsign
-struct Element {
-    /// Part of the callsign
-    pub part: String,
-    /// Type of the part of the callsign
-    pub parttype: PartType,
-}
-
 /// State of the call element classification statemachine
 #[derive(PartialEq, Eq)]
 enum State {
@@ -246,10 +238,9 @@ pub fn analyze_callsign(
     let parts: Vec<&str> = call.split('/').collect();
 
     // Iterate through all parts of the callsign and check wether the part of the callsigns is a valid prefix or something else
-    let mut elements: Vec<Element> = Vec::with_capacity(parts.len());
+    let mut parttypes: Vec<PartType> = Vec::with_capacity(parts.len());
     for (pos, part) in parts.iter().enumerate() {
-        // TODO: Is the assumption below correct for very special prefixes like SV/A? -> What if SV is not a prefix but SV/A is a valid prefix?
-        let pt = if get_prefix(clublog, part, timestamp, &[]).is_some() {
+        let pt = if get_prefix(clublog, part, timestamp, &parts[pos + 1..]).is_some() {
             // MM and AM may be valid prefixes or special appendices depending on the position within the complete callsign.
             // For example MM as a prefix evaluates to Scotland, MM as an appendix indicates a maritime mobile activation.
             // Special appendices are only valid as those if they are right at the beginning of the callsign.
@@ -262,17 +253,14 @@ pub fn analyze_callsign(
         } else {
             PartType::Other
         };
-        elements.push(Element {
-            part: String::from(*part),
-            parttype: pt,
-        });
+        parttypes.push(pt);
     }
 
     // Check for basic validity with a small statemachine.
     // For example check that the call begins with a prefix, has no more than two consecutive prefixes, ...
     let mut state = State::NoPrefix;
-    for element in elements.iter() {
-        match (&state, &element.parttype) {
+    for parttype in parttypes.iter() {
+        match (&state, parttype) {
             (State::NoPrefix, PartType::Prefix) => state = State::SinglePrefix,
             (State::NoPrefix, PartType::Other) => Err(CallsignError::BeginWithoutPrefix)?,
             (State::SinglePrefix, PartType::Prefix) => state = State::PrefixComplete(2),
@@ -309,17 +297,17 @@ pub fn analyze_callsign(
     if state == State::PrefixComplete(1) {
         // Complete homecall
         // Example: W1AW
-        let homecall: &String = &elements[0].part;
+        let homecall = &parts[0];
 
         // Prefix of the homecall
         // Example: W for the homecall W1AW
-        let homecall_prefix = get_prefix(clublog, homecall, timestamp, &elements[1..])
+        let homecall_prefix = get_prefix(clublog, homecall, timestamp, &parts[1..])
             .unwrap()
             .0;
 
         // Special appendix like /AM or /MM is present
         // Example: W1AW/AM
-        if let Some(appendix) = is_no_entity_by_appendix(&elements[1..])? {
+        if let Some(appendix) = is_no_entity_by_appendix(&parts[1..])? {
             return Ok(match appendix {
                 SpecialEntityAppendix::Am => Callsign::new_aeronautical_mobile(call),
                 SpecialEntityAppendix::Mm => Callsign::new_maritime_mobile(call),
@@ -336,12 +324,9 @@ pub fn analyze_callsign(
         // Check if a single digit appendix is present
         // If so, check if the single digit appendix changes the prefix to a different one
         // Example: "SV0ABC/9" where SV is Greece, but SV9 is Crete
-        if let Some(pref) = is_different_prefix_by_single_digit_appendix(
-            clublog,
-            homecall,
-            timestamp,
-            &elements[1..],
-        )? {
+        if let Some(pref) =
+            is_different_prefix_by_single_digit_appendix(clublog, homecall, timestamp, &parts[1..])?
+        {
             let mut callsign = Callsign::from_prefix(call, pref.0);
             apply_cqzone_exception(clublog, &mut callsign, timestamp);
             return Ok(callsign);
@@ -360,9 +345,8 @@ pub fn analyze_callsign(
         // Decide which one to use by how many characters were removed from the potential prefix before it matched a prefix from the list.
         // The prefix which required less character removals wins.
         // This is probably not 100% correct, but seems good enough.
-        let pref_first = get_prefix(clublog, &elements[0].part, timestamp, &elements[1..]).unwrap();
-        let pref_second =
-            get_prefix(clublog, &elements[1].part, timestamp, &elements[1..]).unwrap();
+        let pref_first = get_prefix(clublog, parts[0], timestamp, &parts[1..]).unwrap();
+        let pref_second = get_prefix(clublog, parts[1], timestamp, &parts[1..]).unwrap(); // TODO: shouldn't this start from 2 onwards?
 
         let pref = if pref_first.1 <= pref_second.1 {
             pref_first.0
@@ -392,16 +376,16 @@ fn is_different_prefix_by_single_digit_appendix<'a>(
     clublog: &'a ClubLog,
     homecall: &str,
     timestamp: &DateTime<Utc>,
-    appendices: &[Element],
+    appendices: &[&str],
 ) -> Result<Option<(&'a Prefix, usize)>, CallsignError> {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"^([A-Z0-9]+)(\d)([A-Z0-9]+)$").unwrap();
     }
 
     // Search for single digits in the list of appendices
-    let single_digits: Vec<&Element> = appendices
+    let single_digits: Vec<&&str> = appendices
         .iter()
-        .filter(|e| is_single_digit_appendix(&e.part))
+        .filter(|e| is_single_digit_appendix(e))
         .collect();
     match single_digits.len() {
         0 => return Ok(None),
@@ -411,7 +395,7 @@ fn is_different_prefix_by_single_digit_appendix<'a>(
             return Err(CallsignError::MultipleSingleDigitAppendices);
         }
     }
-    let new_digit = &single_digits[0].part;
+    let new_digit = single_digits[0];
 
     // TODO: RE.replace probably not required here, just assemble new call from both capture groups and the new digit like below
     let new_homecall = RE.replace(homecall, format!("${{1}}{}${{3}}", new_digit));
@@ -427,16 +411,16 @@ fn is_mm_entity(prefix: &Prefix) -> bool {
 /// Check if a special appendix is present that indicates that the actual prefix of the call is not relevant.
 /// Such a appendix may for example be MM (maritime mobile).
 fn is_no_entity_by_appendix(
-    appendices: &[Element],
+    appendices: &[&str],
 ) -> Result<Option<SpecialEntityAppendix>, CallsignError> {
-    let a: Vec<&Element> = appendices
+    let a: Vec<&&str> = appendices
         .iter()
-        .filter(|e| appendix_indicates_no_entity(&e.part).is_some())
+        .filter(|e| appendix_indicates_no_entity(e).is_some())
         .collect();
 
     match a.len() {
         0 => Ok(None),
-        1 => Ok(appendix_indicates_no_entity(&a[0].part)),
+        1 => Ok(appendix_indicates_no_entity(a[0])),
         _ => Err(CallsignError::MultipleSpecialAppendices),
     }
 }
@@ -484,17 +468,17 @@ fn get_prefix<'a>(
     clublog: &'a ClubLog,
     potential_prefix: &str,
     timestamp: &DateTime<Utc>,
-    appendices: &[Element],
+    appendices: &[&str],
 ) -> Option<(&'a Prefix, usize)> {
     let len_potential_prefix = potential_prefix.len();
     assert!(len_potential_prefix >= 1);
 
     // Search for single char appendices
     // For example SV/A is a valid prefix but indicates a different entity as the prefix SV
-    let single_char_appendices: Vec<&Element> = appendices
+    let single_char_appendices: Vec<&&str> = appendices
         .iter()
-        .filter(|e| is_single_char_appendix(&e.part))
-        .collect::<Vec<&Element>>();
+        .filter(|e| is_single_char_appendix(e))
+        .collect();
 
     // Bruteforce all possibilities
     // Shortening the call from the back is required to due to calls like UA9ABC where both prefixes U and UA9 a potential matches,
@@ -507,9 +491,7 @@ fn get_prefix<'a>(
         // Append all single chars to the call as <call>/<appendix> and check if the prefix is valid
         // This check is required for prefixes like SV/A where the callsign SV1ABC/A shall match to
         for appendix in &single_char_appendices {
-            if let Some(pref) =
-                clublog.get_prefix(&format!("{}/{}", slice, appendix.part), timestamp)
-            {
+            if let Some(pref) = clublog.get_prefix(&format!("{}/{}", slice, appendix), timestamp) {
                 prefix = Some((pref, len_potential_prefix - cnt));
                 break;
             }
