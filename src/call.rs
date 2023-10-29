@@ -124,10 +124,6 @@ pub enum CallsignError {
     #[error("Unexpected third prefix")]
     ThirdPrefix,
 
-    /// Multiple single digit appendices
-    #[error("Multiple single digit appendices")]
-    MultipleSingleDigitAppendices,
-
     /// Multiple special appendices that indicate not entity
     #[error("Multiple special appendices that indicate not entity")]
     MultipleSpecialAppendices,
@@ -406,15 +402,14 @@ fn is_different_prefix_by_single_digit_appendix<'a>(
         .iter()
         .filter(|e| is_single_digit_appendix(e))
         .collect();
-    match single_digits.len() {
-        0 => return Ok(None),
-        1 => (),
+    let new_digit = match single_digits.len() {
+        1 => single_digits[0],
         _ => {
-            // TODO: Should this be treated like an error? Just take the first? Ignore all of them?
-            return Err(CallsignError::MultipleSingleDigitAppendices);
+            // 0 single digit appendicies -> Nothing to do
+            // 2 or more single digit appendicies -> Not sure which one to choose, ignore them all
+            return Ok(None);
         }
-    }
-    let new_digit = single_digits[0];
+    };
 
     // TODO: RE.replace probably not required here, just assemble new call from both capture groups and the new digit like below
     let new_homecall = RE.replace(homecall, format!("${{1}}{}${{3}}", new_digit));
