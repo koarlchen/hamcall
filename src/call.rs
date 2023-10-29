@@ -215,6 +215,13 @@ pub fn analyze_callsign(
     call: &str,
     timestamp: &DateTime<Utc>,
 ) -> Result<Callsign, CallsignError> {
+    // Strategy
+    // Step 1: Check for an invalid operation
+    // Step 2: Check for a callsign exception
+    // Step 3: Classify each part of the callsign (split by '/') if it is a valid prefix or something other
+    // Step 4: Check for basic validity of the callsign by using the classification results and categorize the call into generic callsign structures
+    // Step 5: Handle the call based on the determined category
+
     lazy_static! {
         static ref RE_COMPLETE_CALL: Regex = Regex::new(r"^[A-Z0-9]+[A-Z0-9/]*[A-Z0-9]+$").unwrap();
     }
@@ -224,11 +231,13 @@ pub fn analyze_callsign(
         return Err(CallsignError::BasicFormat);
     }
 
+    // ### Step 1 ###
     // Check if the callsign was used in an invalid operation
     if clublog.is_invalid_operation(call, timestamp) {
         return Err(CallsignError::InvalidOperation);
     }
 
+    // ### Step 2 ###
     // Check if clublog lists a callsign exception
     if let Some(call_exc) = clublog.get_callsign_exception(call, timestamp) {
         return Ok(Callsign::from_exception(call, call_exc));
@@ -237,6 +246,7 @@ pub fn analyze_callsign(
     // Split raw callsign into its parts
     let parts: Vec<&str> = call.split('/').collect();
 
+    // ### Step 3 ###
     // Iterate through all parts of the callsign and check wether the part of the callsigns is a valid prefix or something else
     let mut parttypes: Vec<PartType> = Vec::with_capacity(parts.len());
     for (pos, part) in parts.iter().enumerate() {
@@ -256,6 +266,7 @@ pub fn analyze_callsign(
         parttypes.push(pt);
     }
 
+    // ### Step 4 ###
     // Check for basic validity with a small statemachine.
     // For example check that the call begins with a prefix, has no more than two consecutive prefixes, ...
     let mut state = State::NoPrefix;
@@ -275,6 +286,8 @@ pub fn analyze_callsign(
             || state == State::PrefixComplete(2)
             || state == State::SinglePrefix
     );
+
+    // ### Step 5 ###
 
     // Possible state 1:
     // The callsign consists of only one part with no prefix nor appendix
