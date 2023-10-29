@@ -342,16 +342,22 @@ pub fn analyze_callsign(
     // The callsign consists of two prefixes and one or more appendices
     if state == State::PrefixComplete(2) {
         // Get prefix information for both prefixes.
-        // Decide which one to use by how many characters were removed from the potential prefix before it matched a prefix from the list.
-        // The prefix which required less character removals wins.
-        // This is probably not 100% correct, but seems good enough.
         let pref_first = get_prefix(clublog, parts[0], timestamp, &parts[1..]).unwrap();
-        let pref_second = get_prefix(clublog, parts[1], timestamp, &parts[1..]).unwrap(); // TODO: shouldn't this start from 2 onwards?
+        let pref_second = get_prefix(clublog, parts[1], timestamp, &parts[2..]).unwrap();
 
-        let pref = if pref_first.1 <= pref_second.1 {
+        // Check if the first prefix may be a valid special prefix like 3D2/R
+        // Example: "3D2ABC/R" contains two valid prefixes at first sight, 3D2 and R but the first and second prefix together form the special prefix 3D2/R
+        let pref = if pref_first.0.call.contains("/") {
             pref_first.0
         } else {
-            pref_second.0
+            // Decide which one to use by how many characters were removed from the potential prefix before it matched a prefix from the list.
+            // The prefix which required less character removals wins.
+            // This is probably not 100% correct, but seems good enough.
+            if pref_first.1 <= pref_second.1 {
+                pref_first.0
+            } else {
+                pref_second.0
+            }
         };
 
         let mut callsign = Callsign::from_prefix(call, pref);
@@ -645,8 +651,10 @@ mod tests {
     #[test]
     fn special_entity_prefix() {
         let calls = vec![
-            ("SV1ABC/A", "2020-01-01T00:00:00Z", 180),
-            ("SV2/W1AW/A", "2020-01-01T00:00:00Z", 180),
+            ("SV1ABC/A", "2020-01-01T00:00:00Z", 180), // Prefix SV/A
+            ("SV2/W1AW/A", "2020-01-01T00:00:00Z", 180), // Prefix SV/A
+            ("3D2ABC/R", "2020-01-01T00:00:00Z", 460), // Prefix 3D2/R, where 3D2 and R are potential valid prefixes too
+            // ("3D2/W1AW/R", "2020-01-01T00:00:00Z", 460), // Prefix 3D2/R, where 3D2 and R are potential valid prefixes too. FIXME: potential three valid prefixes
         ];
 
         let clublog = read_clublog_xml();
