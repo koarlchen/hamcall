@@ -15,5 +15,5 @@ regex = "1.9.5"
 lazy_static = "1.4.0"
 thiserror = "1.0.48"
 serde = { version = "1.0.188", features = ["derive"] }
-quick-xml = { version = "0.30.0", features = ["serialize"] }
+quick-xml = { version = "0.31.0", features = ["serialize"] }
 chrono = "0.4.31"
