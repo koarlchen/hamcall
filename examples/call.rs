@@ -19,7 +19,7 @@ pub fn main() {
 
         match hamcall::call::analyze_callsign(&clublog, call, &timestamp) {
             Ok(c) => {
-                if hamcall::call::check_whitelist(&clublog, call, c.adif, &timestamp) {
+                if hamcall::call::check_whitelist(&clublog, &c, &timestamp) {
                     println!("{} => {:?}", call, c)
                 } else {
                     println!(

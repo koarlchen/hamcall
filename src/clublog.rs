@@ -20,8 +20,11 @@ pub type CqZone = u8;
 /// Record identifier
 pub type RecordId = u16;
 
-/// Special value for the entity of a prefix that is used maritime mobile
-pub const PREFIX_MARITIME_MOBILE: &str = "MARITIME MOBILE";
+/// Special value for the entity of a callsign exception that is invalid
+pub const CALLSIGN_EXCEPTION_INVALID: &str = "INVALID";
+
+/// Special value for the entity of a callsign exception that is used maritime mobile
+pub const CALLSIGN_EXCEPTION_MARITIME_MOBILE: &str = "MARITIME MOBILE";
 
 /// Special value for the entity of a callsign exception that is aeronautical mobile only
 pub const CALLSIGN_EXCEPTION_AERONAUTICAL_MOBILE: &str = "AERONAUTICAL MOBILE";
@@ -37,12 +40,29 @@ pub const ADIF_ID_NO_DXCC: Adif = 0;
 pub struct Error;
 
 impl ClubLog {
-    /// Parse xml formatted content of the club log country file.
+    /// Parse XML formatted content of the ClubLog data file.
+    ///
+    /// # Arguments
+    ///
+    /// - `content`: Content of the data file
+    ///
+    /// # Returns
+    ///
+    /// Parsed ClubLog data or an error
     pub fn parse(content: &str) -> Result<Self, Error> {
         quick_xml::de::from_str(content).map_err(|_| Error)
     }
 
     /// Get entity information by adif identifier.
+    ///
+    /// # Arguments
+    ///
+    /// - `adif`: ADIF identifier
+    /// - `timestamp`: Timestamp to use for the check
+    ///
+    /// # Returns
+    ///
+    /// Entity information, if present
     pub fn get_entity(&self, adif: Adif, timestamp: &DateTime<Utc>) -> Option<&Entity> {
         self.entities
             .list
@@ -51,6 +71,15 @@ impl ClubLog {
     }
 
     /// Get prefix information by callsign prefix.
+    ///
+    /// # Arguments
+    ///
+    /// - `prefix`: Callsigns prefix, like `DL`
+    /// - `timestamp`: Timestamp to use for the check
+    ///
+    /// # Returns
+    ///
+    /// Prefix information, if present
     pub fn get_prefix(&self, prefix: &str, timestamp: &DateTime<Utc>) -> Option<&Prefix> {
         self.prefixes
             .list
@@ -59,6 +88,15 @@ impl ClubLog {
     }
 
     /// Get callsign exception information by callsign.
+    ///
+    /// # Arguments
+    ///
+    /// - `callsign`: Complete callsign
+    /// - `timestamp`: Timestamp to use for the check
+    ///
+    /// # Returns
+    ///
+    /// Callsign exception information, if present
     pub fn get_callsign_exception(
         &self,
         callsign: &str,
@@ -71,6 +109,15 @@ impl ClubLog {
     }
 
     /// Get cq zone by callsign if an exception for the callsign exists.
+    ///
+    /// # Arguments
+    ///
+    /// - `callsign`: Complete callsign
+    /// - `timestamp`: Timestamp to use for the check
+    ///
+    /// # Returns
+    ///
+    /// CQ zone exception, if present
     pub fn get_zone_exception(&self, callsign: &str, timestamp: &DateTime<Utc>) -> Option<CqZone> {
         let exc = self
             .zone_exceptions
@@ -82,6 +129,15 @@ impl ClubLog {
     }
 
     /// Check if the callsign was used in an invalid operation.
+    ///
+    /// # Arguments
+    ///
+    /// - `callsign`: Complete callsign
+    /// - `timestamp`: Timestamp to use for the check
+    ///
+    /// # Returns
+    ///
+    /// True if the operation is invalid, false otherwise
     pub fn is_invalid_operation(&self, callsign: &str, timestamp: &DateTime<Utc>) -> bool {
         self.invalid_operations
             .list
@@ -91,6 +147,16 @@ impl ClubLog {
 }
 
 /// Check whether a timestamp is within an optional start and end timestamp.
+///
+/// # Arguments
+///
+/// - `timestamp`: Timestamp to use for the check
+/// - `start`: Start timestamp of the time window
+/// - `end`: End timestamp of the time window
+///
+/// # Returns
+///
+/// True if time timestamp is within the time window, false otherwise
 fn is_in_time_window(
     timestamp: &DateTime<Utc>,
     start: Option<DateTime<Utc>>,
@@ -105,6 +171,14 @@ fn is_in_time_window(
 }
 
 /// Custom XML deserializer for a timestamp
+///
+/// # Arguments
+///
+/// - `deserializer`: Deserializer
+///
+/// # Returns
+///
+/// Timestamp or an error
 fn parse_datetime<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
 where
     D: Deserializer<'de>,
@@ -116,6 +190,14 @@ where
 }
 
 /// Custom XML deserializer for an optional timestamp
+///
+/// # Arguments
+///
+/// - `deserializer`: Deserializer
+///
+/// # Returns
+///
+/// Optional timestamp or an error
 fn parse_datetime_opt<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
 where
     D: Deserializer<'de>,
@@ -171,7 +253,7 @@ pub struct Entities {
 /// Therefore only approved callsigns shall be logged for that entity.
 /// The list of approved callsigns is part of the [callsign exception](CallsignException) list.
 /// May also have a look at the timestamps [whitelist_start](Entity::whitelist_start) and [whitelist_end](Entity::whitelist_end) to check whether a whitelist check is required or not.
-/// Note, that the timstamps are not necessarily present if a entity is whitelisted.
+/// Note, that the whitlist timstamps are not necessarily present if a entity is whitelisted.
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct Entity {
     /// ADIF identifier
@@ -180,7 +262,7 @@ pub struct Entity {
     pub name: String,
     /// Main callsign prefix
     pub prefix: String,
-    /// Entity deleted after [end](Entity::end)
+    /// Entity deleted/invalid
     pub deleted: bool,
     /// CQ zone
     pub cqz: Option<CqZone>,
@@ -198,7 +280,7 @@ pub struct Entity {
     #[serde(default)]
     #[serde(deserialize_with = "parse_datetime_opt")]
     pub end: Option<DateTime<Utc>>,
-    /// True if only a whitelist of callsigns are valid for this entity
+    /// True if only whitelisted of callsigns are valid for this entity
     pub whitelist: Option<bool>,
     /// Timestamp after which the whitelist shall be used
     #[serde(default)]
@@ -220,15 +302,21 @@ pub struct CallsignExceptions {
 
 /// Callsign exception.
 ///
-/// An entry represents an exceptions to a callsign [prefix](Prefix).
-/// When searching for a matching entry the [callsign](CallsignException::call) must match exactly including prefix, suffix and appendix.
+/// An entry represents an exception to a callsigns actual [prefix](Prefix).
+/// When searching for a matching entry, the [callsign](CallsignException::call) must match exactly including prefix, suffix and appendix.
 ///
-/// An entry may indicate a different value for the fields [adif](CallsignException::adif), [cqz](CallsignException::cqz), [cont](CallsignException::cont), [cont](CallsignException::cont), [lat](CallsignException::lat) or [lat](CallsignException::long) compared to the values of the matching [prefix](Prefix) entry.
+/// An entry indicates a different value for the field [adif](CallsignException::adif)
+/// The fields [cqz](CallsignException::cqz), [cont](CallsignException::cont), [cont](CallsignException::cont), [lat](CallsignException::lat) or [lat](CallsignException::long) are optional and may contain different information compared to the values of the matching [prefix](Prefix) entry.
 /// While searching through the list of exceptions make sure to also validate against the optional [start](CallsignException::start) and [end](CallsignException::end) timestamps.
 ///
-/// A few callsign exceptions refer in their [entity](CallsignException::entity) field special entity names for [aeronautical mobile](CALLSIGN_EXCEPTION_AERONAUTICAL_MOBILE) and [satellite, internet or repeater](CALLSIGN_EXCEPTION_SATELLITE).
-/// Within those entries the [adif](CallsignException::adif) field contains special identifiers for [aeronautical mobile](ADIF_ID_AERONAUTICAL_MOBILE) and [satellite, internet or repeater](ADIF_ID_SATELLITE).
-/// Note that those special adif identifiers or rather entities are not part of the [entity list](Entities).
+/// A few callsign exceptions refer in their [entity](CallsignException::entity) field special entity names for [maritime mobile](CALLSIGN_EXCEPTION_MARITIME_MOBILE), [aeronautical mobile](CALLSIGN_EXCEPTION_AERONAUTICAL_MOBILE) and [satellite, internet or repeater](CALLSIGN_EXCEPTION_SATELLITE).
+/// Within those entries the [adif](CallsignException::adif) field is set to zero (see also [ADIF_ID_NO_DXCC]) according to the ADIF specification.
+/// Note that the special zero adif identifier is not part of the [entity list](Entities).
+///
+/// The [entity](CallsignException::entity) field may also contain the string [INVALID](CALLSIGN_EXCEPTION_INVALID),
+/// In this special case the callsign is invalid.
+/// The information, if a call is invalid is also part of the [invalid operations list](InvalidOperations).
+/// There are historical reasons, why the same information is part of two lists.
 ///
 /// Note: Valid callsigns for a [whitelisted entity](Entity::whitelist) are also part of the callsign exception list.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -275,9 +363,6 @@ pub struct Prefixes {
 /// Even all other fields of that two entries feature the same data.
 /// While searching for a matching prefix make sure to also validate against the optional [start](Prefix::start) and [end](Prefix::end) timestamps.
 ///
-/// If the fields [adif](Prefix::adif), [cqz](Prefix::cqz), [cont](Prefix::cont), [long](Prefix::long) and [lat](Prefix::lat) are `None`
-/// the [entity](Prefix::entity) field may be [invalid](PREFIX_INVALID) or marked as [maritime mobile](PREFIX_MARITIME_MOBILE).
-///
 /// Note: While searching for a prefix, next to obvious prefixes like `DL`, there are also speical ones listed like `SV/A`.
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct Prefix {
@@ -320,6 +405,8 @@ pub struct InvalidOperations {
 /// An entry represents an invalid operation.
 /// When searching for a matching entry the [callsign](InvalidOperation::call) must match exactly including prefix, suffix and appendix.
 /// Furthermore, check the validity against the optional [start](InvalidOperation::start) and [end](InvalidOperation::end) timestamps.
+///
+/// Note: this information is for historical reasons also part of the [callsign exceptions](CallsignException).
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename = "Invalid")]
 pub struct InvalidOperation {

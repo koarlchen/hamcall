@@ -6,9 +6,7 @@
 //!
 //! The example `call.rs` shows the basic usage of this module.
 
-use crate::clublog::{
-    Adif, CallsignException, ClubLog, CqZone, Prefix, ADIF_ID_NO_DXCC, PREFIX_MARITIME_MOBILE,
-};
+use crate::clublog::{Adif, CallsignException, ClubLog, CqZone, Prefix, ADIF_ID_NO_DXCC};
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -35,11 +33,27 @@ pub struct Callsign {
 
 impl Callsign {
     /// Check if callsign is assigned to no DXCC (like for /AM, /MM or /SAT)
+    ///
+    /// # Arguments
+    ///
+    /// (None)
+    ///
+    /// # Returns
+    ///
+    /// True if the callsign is assigned to no DXCC
     pub fn is_special_entity(&self) -> bool {
         self.adif == ADIF_ID_NO_DXCC
     }
 
     /// Instantiate a new maritime mobile callsign
+    ///
+    /// # Arguments
+    ///
+    /// - `call`: Callsign
+    ///
+    /// # Returns
+    ///
+    /// Callsign struct
     fn new_maritime_mobile(call: &str) -> Callsign {
         Callsign {
             call: String::from(call),
@@ -53,6 +67,14 @@ impl Callsign {
     }
 
     /// Instantiate a new aeronautical mobile callsign
+    ///
+    /// # Arguments
+    ///
+    /// - `call`: Callsign
+    ///
+    /// # Returns
+    ///
+    /// Callsign struct
     fn new_aeronautical_mobile(call: &str) -> Callsign {
         Callsign {
             call: String::from(call),
@@ -66,6 +88,14 @@ impl Callsign {
     }
 
     /// Instantiate a new satellite callsign
+    ///
+    /// # Arguments
+    ///
+    /// - `call`: Callsign
+    ///
+    /// # Returns
+    ///
+    /// Callsign struct
     fn new_satellite(call: &str) -> Callsign {
         Callsign {
             call: String::from(call),
@@ -78,7 +108,16 @@ impl Callsign {
         }
     }
 
-    /// Instantiate a new callsign from a clublog prefix
+    /// Instantiate a new callsign from a ClubLog prefix
+    ///
+    /// # Arguments
+    ///
+    /// - `call`: Callsign
+    /// - `prefix`: Callsign exception entry
+    ///
+    /// # Returns
+    ///
+    /// Callsign struct
     fn from_prefix(call: &str, prefix: &Prefix) -> Callsign {
         Callsign {
             call: String::from(call),
@@ -91,7 +130,16 @@ impl Callsign {
         }
     }
 
-    /// Instantiate a new callsign from a clublog callsign exception
+    /// Instantiate a new callsign from a ClubLog callsign exception
+    ///
+    /// # Arguments
+    ///
+    /// - `call`: Callsign
+    /// - `exc`: Callsign exception entry
+    ///
+    /// # Returns
+    ///
+    /// Callsign struct
     fn from_exception(call: &str, exc: &CallsignException) -> Callsign {
         Callsign {
             call: String::from(call),
@@ -124,8 +172,8 @@ pub enum CallsignError {
     #[error("Too much prefixes")]
     TooMuchPrefixes,
 
-    /// Multiple special appendices that indicate not entity
-    #[error("Multiple special appendices that indicate not entity")]
+    /// Multiple special appendices like /MM, /AM or /6, /8, ...
+    #[error("Multiple special appendices")]
     MultipleSpecialAppendices,
 }
 
@@ -155,35 +203,37 @@ enum State {
 }
 
 /// Appendix that indicates that the calls entity may be ignored
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 enum SpecialEntityAppendix {
-    /// Maritime Mobile
+    /// Maritime Mobile (/MM)
     Mm,
-    /// Aeronautical Mobile
+    /// Aeronautical Mobile (/AM)
     Am,
-    /// Satellite, Internet or Repeater
+    /// Satellite, Internet or Repeater (/SAT)
     Sat,
 }
 
 /// Check if the callsign is whitelisted if the whitelist option is enabled for the entity of the callsign at the given point in time.
 ///
+/// # Arguments
+///
+/// - `clublog`: Reference to ClubLog data
+/// - `call`: Callsign to check
+/// - `timestamp`: Timestamp to use for the check
+///
+/// # Returns
+///
 /// Returns true if the callsign is valid or false if whitelisting for that entity is enabled and the callsign is not on the whitelist.
-/// This function does not check for the general validity of that callsign. You probably want to use [analyze_callsign] beforehand.
-pub fn check_whitelist(
-    clublog: &ClubLog,
-    call: &str,
-    adif: Adif,
-    timestamp: &DateTime<Utc>,
-) -> bool {
+pub fn check_whitelist(clublog: &ClubLog, call: &Callsign, timestamp: &DateTime<Utc>) -> bool {
     // Get entity for adif identifier
     // Note that not all valid adif identifiers refer to an entity (e.g. aeronautical mobile calls)
-    if let Some(entity) = clublog.get_entity(adif, timestamp) {
+    if let Some(entity) = clublog.get_entity(call.adif, timestamp) {
         // Check if whitelisting is enabled
         if entity.whitelist == Some(true) {
             // Check if an exception for the call at the given point in time is present
-            if let Some(prefix) = clublog.get_callsign_exception(call, timestamp) {
+            if let Some(prefix) = clublog.get_callsign_exception(&call.call, timestamp) {
                 // There may be a callsign exception for a whitelisted entity but the exception refers a different adif identifier
-                return prefix.adif == adif;
+                return prefix.adif == call.adif;
             }
 
             // Check if the given point in time is before the start of whitelisting for that entity
@@ -208,6 +258,16 @@ pub fn check_whitelist(
 }
 
 /// Analyze callsign to get further information like the name of the entity or the AIDF DXCC identifier.
+///
+/// # Arguments:
+///
+/// - `clublog`: Reference to ClubLog data
+/// - `call`: Callsign to analyze
+/// - `timestamp`: Timestamp to use for the check
+///
+/// # Returns
+///
+/// Returns further information about the callsign or an error.
 pub fn analyze_callsign(
     clublog: &ClubLog,
     call: &str,
@@ -216,7 +276,7 @@ pub fn analyze_callsign(
     // Strategy
     // Step 1: Check for an invalid operation
     // Step 2: Check for a callsign exception
-    // Step 3: Classify each part of the callsign (split by '/') if it is a valid prefix or something other
+    // Step 3: Classify each part of the callsign (split by '/') if it is a valid prefix or not
     // Step 4: Check for basic validity of the callsign by using the classification results and categorize the call into generic callsign structures
     // Step 5: Handle the call based on the determined category
 
@@ -253,7 +313,7 @@ pub fn analyze_callsign(
             // For example MM as a prefix evaluates to Scotland, MM as an appendix indicates a maritime mobile activation.
             // Special appendices are only valid as those if they are right at the beginning of the callsign.
             // Therefore ignore the first element of the call and check for special appendices beginning from the second element onwards.
-            if pos >= 1 && is_special_appendix(part) {
+            if pos >= 1 && APPENDIX_SPECIAL.contains(part) {
                 PartType::Other
             } else {
                 PartType::Prefix
@@ -266,7 +326,7 @@ pub fn analyze_callsign(
 
     // ### Step 4 ###
     // Check for basic validity with a small statemachine.
-    // For example check that the call begins with a prefix, has no more than two consecutive prefixes, ...
+    // For example check that the call begins with a prefix, has not too much prefixes, ...
     let mut state = State::NoPrefix;
     for parttype in parttypes.iter() {
         match (&state, parttype) {
@@ -291,24 +351,19 @@ pub fn analyze_callsign(
 
             // Prefix of the homecall
             // Example: W for the homecall W1AW
-            let homecall_prefix = get_prefix(clublog, homecall, timestamp, &parts[1..])
+            // Unwrap is safe here, otherwise there is an internal error
+            let mut homecall_prefix = get_prefix(clublog, homecall, timestamp, &parts[1..])
                 .unwrap()
                 .0;
 
             // Special appendix like /AM or /MM is present
-            // Example: W1AW/AM
+            // Example: W1ABC/AM
             if let Some(appendix) = is_no_entity_by_appendix(&parts[1..])? {
                 return Ok(match appendix {
                     SpecialEntityAppendix::Am => Callsign::new_aeronautical_mobile(call),
                     SpecialEntityAppendix::Mm => Callsign::new_maritime_mobile(call),
                     SpecialEntityAppendix::Sat => Callsign::new_satellite(call),
                 });
-            }
-
-            // Entity name referenced in prefix is /MM
-            // Example: prefix record 7069
-            if is_mm_entity(homecall_prefix) {
-                return Ok(Callsign::new_maritime_mobile(call));
             }
 
             // Check if a single digit appendix is present
@@ -320,14 +375,12 @@ pub fn analyze_callsign(
                 timestamp,
                 &parts[1..],
             )? {
-                let mut callsign = Callsign::from_prefix(call, pref.0);
-                apply_cqzone_exception(clublog, &mut callsign, timestamp);
-                return Ok(callsign);
+                homecall_prefix = pref;
             }
 
             // No special rule matched, just return information
             let mut callsign = Callsign::from_prefix(call, homecall_prefix);
-            apply_cqzone_exception(clublog, &mut callsign, timestamp);
+            check_apply_cqzone_exception(clublog, &mut callsign, timestamp);
             Ok(callsign)
         }
         // The callsign consists of two prefixes and zero or more appendices
@@ -352,17 +405,18 @@ pub fn analyze_callsign(
             };
 
             let mut callsign = Callsign::from_prefix(call, pref);
-            apply_cqzone_exception(clublog, &mut callsign, timestamp);
+            check_apply_cqzone_exception(clublog, &mut callsign, timestamp);
             Ok(callsign)
         }
         // The callsign consists out of three prefixes and zero or more appendices
         // This is a very special case and only takes account of calls with a special prefix like 3D2/R and therefore callsigns like 3D2/W1ABC/R.
-        // This call contains three potential valid prefixes 3D2, W and R but 3D2/R is the actual prefix (according to my understanding of the special prefix annotation)
+        // Calls like 3D2ABC/R are already covered, since there are only two potential valid prefixes.
+        // The call 3D2/W1ABC/R contains three potential valid prefixes 3D2, W and R but 3D2/R is the actual prefix (according to my understanding of the special prefix annotation)
         State::PrefixComplete(3) => {
             let pref = get_prefix(clublog, parts[0], timestamp, &parts[1..]).unwrap();
             if pref.0.call.contains('/') {
                 let mut callsign = Callsign::from_prefix(call, pref.0);
-                apply_cqzone_exception(clublog, &mut callsign, timestamp);
+                check_apply_cqzone_exception(clublog, &mut callsign, timestamp);
                 Ok(callsign)
             } else {
                 Err(CallsignError::TooMuchPrefixes)
@@ -372,22 +426,44 @@ pub fn analyze_callsign(
     }
 }
 
-/// Update CQ zone of callsign if a zone exception is present
-fn apply_cqzone_exception(clublog: &ClubLog, call: &mut Callsign, timestamp: &DateTime<Utc>) {
+/// Check if a CQ zone exception exists based on the gathered callsign information.
+/// If there is one, replace the CQ zone directly in the given callsign struct.
+///
+/// # Arguments
+///
+/// - `clublog`: Reference to ClubLog data
+/// - `call`: Gathered callsign information
+/// - `timestamp`: Timestamp to use for the check
+///
+/// # Returns
+/// (None)
+fn check_apply_cqzone_exception(clublog: &ClubLog, call: &mut Callsign, timestamp: &DateTime<Utc>) {
     if let Some(cqz) = clublog.get_zone_exception(&call.call, timestamp) {
         call.cqzone = Some(cqz);
     }
 }
 
 /// Check if the list of appendices contains an appendix with a single digit that may indicate a different prefix.
-/// If there is such single digit appendix replace the digit within the callsign and query information for the new prefix.
+/// If there is such single digit appendix, replace the digit within the callsign and query the prefix information for the potential new prefix.
+///
 /// Example: "SV0ABC/9" where SV is Greece, but SV9 is Crete
+///
+/// # Arguments
+///
+/// - `clublog`: Reference to ClubLog data
+/// - `homecall`: Part of the complete callsign that is assumend to be the homecall
+/// - `timestamp`: Timestamp to use for the check
+/// - `appendices`: List of appendices to the homecall
+///
+/// # Returns
+///
+/// A potential new prefix, `None` if nothing changed or an error.
 fn is_different_prefix_by_single_digit_appendix<'a>(
     clublog: &'a ClubLog,
     homecall: &str,
     timestamp: &DateTime<Utc>,
     appendices: &[&str],
-) -> Result<Option<(&'a Prefix, usize)>, CallsignError> {
+) -> Result<Option<&'a Prefix>, CallsignError> {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"^([A-Z0-9]+)(\d)([A-Z0-9]+)$").unwrap();
     }
@@ -395,84 +471,82 @@ fn is_different_prefix_by_single_digit_appendix<'a>(
     // Search for single digits in the list of appendices
     let single_digits: Vec<&&str> = appendices
         .iter()
-        .filter(|e| is_single_digit_appendix(e))
+        .filter(|e| {
+            if e.len() == 1 {
+                e.chars().next().unwrap().is_numeric()
+            } else {
+                false
+            }
+        })
         .collect();
+
+    // Act based on how much single digit appendices were found
     let new_digit = match single_digits.len() {
+        // Nothing to do if there is no single digit
+        0 => return Ok(None),
+        // If there is only a single digit, take it
         1 => single_digits[0],
-        _ => {
-            // 0 single digit appendicies -> Nothing to do
-            // 2 or more single digit appendicies -> Not sure which one to choose, ignore them all
-            return Ok(None);
-        }
+        // For multiple single digits throw an error -> not sure which one to choose? Ignoring all would also be unexpected behaviour
+        _ => return Err(CallsignError::MultipleSpecialAppendices),
     };
 
-    // TODO: RE.replace probably not required here, just assemble new call from both capture groups and the new digit like below
+    // Assemble potential new intermediate call that will be used to check for a potential different prefix
     let new_homecall = RE.replace(homecall, format!("${{1}}{}${{3}}", new_digit));
 
-    Ok(get_prefix(clublog, &new_homecall, timestamp, appendices))
+    Ok(get_prefix(clublog, &new_homecall, timestamp, appendices).map(|i| i.0))
 }
 
-/// Check if the entity named in the prefix indicates a maritime mobile callsign
-fn is_mm_entity(prefix: &Prefix) -> bool {
-    prefix.entity == PREFIX_MARITIME_MOBILE
-}
-
-/// Check if a special appendix is present that indicates that the actual prefix of the call is not relevant.
-/// Such a appendix may for example be MM (maritime mobile).
+/// Check if a special appendix is part of the appendices list.
+/// If such a speical appendix is present, it indicates that the actual prefix of the overall shall be ignored.
+///
+/// Example: /MM indicates maritime mobile and therefore does not reference an entity
+///
+/// # Arguments
+///
+/// - `appendices`: List of callsign appendices, like `QRP`, `5`, ...
+///
+/// # Returns
+///
+/// A potential special entity appendix or an error.
 fn is_no_entity_by_appendix(
     appendices: &[&str],
 ) -> Result<Option<SpecialEntityAppendix>, CallsignError> {
-    let a: Vec<&&str> = appendices
+    // Search for special appendices
+    let a: Vec<SpecialEntityAppendix> = appendices
         .iter()
-        .filter(|e| appendix_indicates_no_entity(e).is_some())
+        .filter_map(|e| match *e {
+            "MM" => Some(SpecialEntityAppendix::Mm),
+            "AM" => Some(SpecialEntityAppendix::Am),
+            "SAT" => Some(SpecialEntityAppendix::Sat),
+            _ => None,
+        })
         .collect();
 
+    // Act based on how much special appendices were found
     match a.len() {
+        // Zero found, nothing to do
         0 => Ok(None),
-        1 => Ok(appendix_indicates_no_entity(a[0])),
+        // Single one found, return it
+        1 => Ok(Some(a[0].clone())),
+        // Multiple found, throw an error -> which one to choose?
         _ => Err(CallsignError::MultipleSpecialAppendices),
-    }
-}
-
-/// Check if a potential appendix equals a special appendix which requires special treatment of the call prefix.
-/// For example AM (aeronautical mobile) indicates that the call prefix information may not need to be considered.
-fn appendix_indicates_no_entity(potential_appendix: &str) -> Option<SpecialEntityAppendix> {
-    match potential_appendix {
-        "MM" => Some(SpecialEntityAppendix::Mm),
-        "AM" => Some(SpecialEntityAppendix::Am),
-        "SAT" => Some(SpecialEntityAppendix::Sat),
-        _ => None,
-    }
-}
-
-/// Check if the potential appendix is a special appendix
-/// See [APPENDIX_SPECIAL].
-fn is_special_appendix(potential_appendix: &str) -> bool {
-    APPENDIX_SPECIAL.contains(&potential_appendix)
-}
-
-/// Check if the potential appendix is a single digit appendix
-fn is_single_digit_appendix(potential_appendix: &str) -> bool {
-    if potential_appendix.len() == 1 {
-        potential_appendix.chars().next().unwrap().is_numeric()
-    } else {
-        false
-    }
-}
-
-/// Check if the potential appendix is a single char appendix
-fn is_single_char_appendix(potential_appendix: &str) -> bool {
-    if potential_appendix.len() == 1 {
-        potential_appendix.chars().next().unwrap().is_alphabetic()
-    } else {
-        false
     }
 }
 
 /// Search for a matching prefix by brutforcing all possibilities.
 /// The potential prefix will be shortened char by char from the back until a prefix matches.
 /// Furthermore, to take in account of prefixes like SV/A, append all single char appendices to the end of the potential prefix before checking for a match.
-/// Next to the prefix information the number of removed chars is returned.
+///
+/// # Arguments
+///
+/// - `clublog`: Reference to ClubLog data
+/// - `potential_prefix`: Potential prefix to check against the data
+/// - `timestamp`: Timestamp to use for the check
+/// - `appendices`: List of callsign appendices, like `QRP`, `5`, ...
+///
+/// # Returns
+///
+/// If there is a match, next to the prefix information the number of removed chars is returned.
 fn get_prefix<'a>(
     clublog: &'a ClubLog,
     potential_prefix: &str,
@@ -486,7 +560,13 @@ fn get_prefix<'a>(
     // For example SV/A is a valid prefix but indicates a different entity as the prefix SV
     let single_char_appendices: Vec<&&str> = appendices
         .iter()
-        .filter(|e| is_single_char_appendix(e))
+        .filter(|e| {
+            if e.len() == 1 {
+                e.chars().next().unwrap().is_alphabetic()
+            } else {
+                false
+            }
+        })
         .collect();
 
     // Bruteforce all possibilities
@@ -499,13 +579,11 @@ fn get_prefix<'a>(
 
         // Append all single chars to the call as <call>/<appendix> and check if the prefix is valid
         // This check is required for prefixes like SV/A where the callsign SV1ABC/A shall match to
-        for appendix in &single_char_appendices {
-            if let Some(pref) = clublog.get_prefix(&format!("{}/{}", slice, appendix), timestamp) {
-                prefix = Some((pref, len_potential_prefix - cnt));
-                break;
-            }
-        }
-        if prefix.is_some() {
+        if let Some(pref) = single_char_appendices
+            .iter()
+            .find_map(|a| clublog.get_prefix(&format!("{}/{}", slice, a), timestamp))
+        {
+            prefix = Some((pref, len_potential_prefix - cnt));
             break;
         }
 
@@ -573,24 +651,19 @@ mod tests {
 
     #[test]
     fn clublog_whitelist() {
-        let calls = vec![
-            ("KH4AB", 174, "1975-01-01T00:00:00Z", true), // Timestamp before start of whitelist (note: prefix would be invalid, but that check is by design not part of the tested function)
-            ("KH4AB", 174, "1981-01-01T00:00:00Z", false), // Timestamp after start of whitelist and call not part of exception list
-            ("KH4AB", 174, "1980-04-07T00:00:00Z", true), // Timestamp after start of whitelist and call is part of exception list
-            ("KH4AB", 174, "1983-01-02T00:00:00Z", false), // Timestamp after start of whitelist, call is part of exception list but with different adif identifier
+        let params = vec![
+            ("KH4AB", "1980-04-07T00:00:00Z", true), // Timestamp after start of whitelist and call is part of exception list
+            ("KH4AB", "1981-01-01T00:00:00Z", false), // Timestamp after start of whitelist and call not part of exception list
         ];
 
         let clublog = read_clublog_xml();
 
-        for call in calls.iter() {
-            println!("Test for: {}", call.0);
-            let res = check_whitelist(
-                clublog,
-                call.0,
-                call.1,
-                &DateTime::parse_from_rfc3339(call.2).unwrap().into(),
-            );
-            assert_eq!(call.3, res);
+        for param in params.iter() {
+            println!("Test for: {}", param.0);
+            let timestamp = &DateTime::parse_from_rfc3339(param.1).unwrap().into();
+            let call = analyze_callsign(clublog, param.0, timestamp).unwrap();
+            let res = check_whitelist(clublog, &call, timestamp);
+            assert_eq!(param.2, res);
         }
     }
 

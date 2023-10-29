@@ -43,7 +43,3 @@ If you were able to find an entry that leads to a different interpretation of th
   As of now the interpretation of these prefixes is not as clear as it should be.
   As noted above the call `SV1ABC/A` may not be valid for Mount Athos (`SV/A`).
   Since Mount Athos is currently whitelisted, this is not such a big deal, but not all special prefixes reference entites that are whitelisted.
-  Furthermore, special prefixes, where both parts of the prefix are valid prefixes for itself are not covered correctly in all cases.
-  For example `3D2` references Fiji Islands and `R` references European Russia but both parts together reference Rotuma (`3D2/R`).
-  Calls like `3D2ABC/R` are correctly mapped to Rotuma but calls like `3D2/W1ABC/R` will currently lead to an error, since the call contains three potential valid prefixes (`3D2`, `W` and `R`) which is considered to be invalid by the current implementation.
-  Maybe this type call is after all not valid, but thats my current interepretation of the prefix `3D2/R`.
