@@ -14,12 +14,13 @@ pub fn main() {
 
         let raw = fs::read_to_string(file).unwrap();
         let clublog = hamcall::clublog::ClubLog::parse(&raw).unwrap();
+        let clublogmap = hamcall::clublogmap::ClubLogMap::from(clublog);
 
         let timestamp = Utc::now();
 
-        match hamcall::call::analyze_callsign(&clublog, call, &timestamp) {
+        match hamcall::call::analyze_callsign(&clublogmap, call, &timestamp) {
             Ok(c) => {
-                if hamcall::call::check_whitelist(&clublog, &c, &timestamp) {
+                if hamcall::call::check_whitelist(&clublogmap, &c, &timestamp) {
                     println!("{} => {:?}", call, c)
                 } else {
                     println!(

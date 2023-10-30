@@ -2,6 +2,8 @@ use chrono::Utc;
 use std::env;
 use std::fs;
 
+use hamcall::clublogquery::ClubLogQuery;
+
 pub fn main() {
     let args: Vec<String> = env::args().collect();
 

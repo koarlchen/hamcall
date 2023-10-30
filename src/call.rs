@@ -6,7 +6,8 @@
 //!
 //! The example `call.rs` shows the basic usage of this module.
 
-use crate::clublog::{Adif, CallsignException, ClubLog, CqZone, Prefix, ADIF_ID_NO_DXCC};
+use crate::clublog::{Adif, CallsignException, CqZone, Prefix, ADIF_ID_NO_DXCC};
+use crate::clublogquery::ClubLogQuery;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -224,7 +225,11 @@ enum SpecialEntityAppendix {
 /// # Returns
 ///
 /// Returns true if the callsign is valid or false if whitelisting for that entity is enabled and the callsign is not on the whitelist.
-pub fn check_whitelist(clublog: &ClubLog, call: &Callsign, timestamp: &DateTime<Utc>) -> bool {
+pub fn check_whitelist(
+    clublog: &dyn ClubLogQuery,
+    call: &Callsign,
+    timestamp: &DateTime<Utc>,
+) -> bool {
     // Get entity for adif identifier
     // Note that not all valid adif identifiers refer to an entity (e.g. aeronautical mobile calls)
     if let Some(entity) = clublog.get_entity(call.adif, timestamp) {
@@ -269,7 +274,7 @@ pub fn check_whitelist(clublog: &ClubLog, call: &Callsign, timestamp: &DateTime<
 ///
 /// Returns further information about the callsign or an error.
 pub fn analyze_callsign(
-    clublog: &ClubLog,
+    clublog: &dyn ClubLogQuery,
     call: &str,
     timestamp: &DateTime<Utc>,
 ) -> Result<Callsign, CallsignError> {
@@ -437,7 +442,11 @@ pub fn analyze_callsign(
 ///
 /// # Returns
 /// (None)
-fn check_apply_cqzone_exception(clublog: &ClubLog, call: &mut Callsign, timestamp: &DateTime<Utc>) {
+fn check_apply_cqzone_exception(
+    clublog: &dyn ClubLogQuery,
+    call: &mut Callsign,
+    timestamp: &DateTime<Utc>,
+) {
     if let Some(cqz) = clublog.get_zone_exception(&call.call, timestamp) {
         call.cqzone = Some(cqz);
     }
@@ -459,7 +468,7 @@ fn check_apply_cqzone_exception(clublog: &ClubLog, call: &mut Callsign, timestam
 ///
 /// A potential new prefix, `None` if nothing changed or an error.
 fn is_different_prefix_by_single_digit_appendix<'a>(
-    clublog: &'a ClubLog,
+    clublog: &'a dyn ClubLogQuery,
     homecall: &str,
     timestamp: &DateTime<Utc>,
     appendices: &[&str],
@@ -548,7 +557,7 @@ fn is_no_entity_by_appendix(
 ///
 /// If there is a match, next to the prefix information the number of removed chars is returned.
 fn get_prefix<'a>(
-    clublog: &'a ClubLog,
+    clublog: &'a dyn ClubLogQuery,
     potential_prefix: &str,
     timestamp: &DateTime<Utc>,
     appendices: &[&str],
@@ -600,13 +609,15 @@ fn get_prefix<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{clublog::ClubLog, clublogmap::ClubLogMap};
     use lazy_static::lazy_static;
     use std::fs;
 
-    fn read_clublog_xml() -> &'static ClubLog {
+    fn read_clublog_xml() -> &'static dyn ClubLogQuery {
         lazy_static! {
-            static ref CLUBLOG: ClubLog =
-                ClubLog::parse(&fs::read_to_string("data/clublog/cty.xml").unwrap()).unwrap();
+            static ref CLUBLOG: ClubLogMap = ClubLogMap::from(
+                ClubLog::parse(&fs::read_to_string("data/clublog/cty.xml").unwrap()).unwrap()
+            );
         }
 
         &*CLUBLOG

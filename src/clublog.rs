@@ -7,6 +7,7 @@
 //!
 //! The example `clublog.rs` shows the basic usage of this module.
 
+use crate::clublogquery::ClubLogQuery;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer};
 use std::vec::Vec;
@@ -39,6 +40,46 @@ pub const ADIF_ID_NO_DXCC: Adif = 0;
 #[derive(Debug)]
 pub struct Error;
 
+impl ClubLogQuery for ClubLog {
+    fn get_entity(&self, adif: Adif, timestamp: &DateTime<Utc>) -> Option<&Entity> {
+        self.entities
+            .list
+            .iter()
+            .find(|e| e.adif == adif && is_in_time_window(timestamp, e.start, e.end))
+    }
+    fn get_prefix(&self, prefix: &str, timestamp: &DateTime<Utc>) -> Option<&Prefix> {
+        self.prefixes
+            .list
+            .iter()
+            .find(|p| p.call == prefix && is_in_time_window(timestamp, p.start, p.end))
+    }
+    fn get_callsign_exception(
+        &self,
+        callsign: &str,
+        timestamp: &DateTime<Utc>,
+    ) -> Option<&CallsignException> {
+        self.exceptions
+            .list
+            .iter()
+            .find(|e| e.call == callsign && is_in_time_window(timestamp, e.start, e.end))
+    }
+    fn get_zone_exception(&self, callsign: &str, timestamp: &DateTime<Utc>) -> Option<CqZone> {
+        let exc = self
+            .zone_exceptions
+            .list
+            .iter()
+            .find(|o| o.call == callsign && is_in_time_window(timestamp, o.start, o.end))?;
+
+        Some(exc.zone)
+    }
+    fn is_invalid_operation(&self, callsign: &str, timestamp: &DateTime<Utc>) -> bool {
+        self.invalid_operations
+            .list
+            .iter()
+            .any(|o| o.call == callsign && is_in_time_window(timestamp, o.start, o.end))
+    }
+}
+
 impl ClubLog {
     /// Parse XML formatted content of the ClubLog data file.
     ///
@@ -52,101 +93,9 @@ impl ClubLog {
     pub fn parse(content: &str) -> Result<Self, Error> {
         quick_xml::de::from_str(content).map_err(|_| Error)
     }
-
-    /// Get entity information by adif identifier.
-    ///
-    /// # Arguments
-    ///
-    /// - `adif`: ADIF identifier
-    /// - `timestamp`: Timestamp to use for the check
-    ///
-    /// # Returns
-    ///
-    /// Entity information, if present
-    pub fn get_entity(&self, adif: Adif, timestamp: &DateTime<Utc>) -> Option<&Entity> {
-        self.entities
-            .list
-            .iter()
-            .find(|e| e.adif == adif && is_in_time_window(timestamp, e.start, e.end))
-    }
-
-    /// Get prefix information by callsign prefix.
-    ///
-    /// # Arguments
-    ///
-    /// - `prefix`: Callsigns prefix, like `DL`
-    /// - `timestamp`: Timestamp to use for the check
-    ///
-    /// # Returns
-    ///
-    /// Prefix information, if present
-    pub fn get_prefix(&self, prefix: &str, timestamp: &DateTime<Utc>) -> Option<&Prefix> {
-        self.prefixes
-            .list
-            .iter()
-            .find(|p| p.call == prefix && is_in_time_window(timestamp, p.start, p.end))
-    }
-
-    /// Get callsign exception information by callsign.
-    ///
-    /// # Arguments
-    ///
-    /// - `callsign`: Complete callsign
-    /// - `timestamp`: Timestamp to use for the check
-    ///
-    /// # Returns
-    ///
-    /// Callsign exception information, if present
-    pub fn get_callsign_exception(
-        &self,
-        callsign: &str,
-        timestamp: &DateTime<Utc>,
-    ) -> Option<&CallsignException> {
-        self.exceptions
-            .list
-            .iter()
-            .find(|e| e.call == callsign && is_in_time_window(timestamp, e.start, e.end))
-    }
-
-    /// Get cq zone by callsign if an exception for the callsign exists.
-    ///
-    /// # Arguments
-    ///
-    /// - `callsign`: Complete callsign
-    /// - `timestamp`: Timestamp to use for the check
-    ///
-    /// # Returns
-    ///
-    /// CQ zone exception, if present
-    pub fn get_zone_exception(&self, callsign: &str, timestamp: &DateTime<Utc>) -> Option<CqZone> {
-        let exc = self
-            .zone_exceptions
-            .list
-            .iter()
-            .find(|o| o.call == callsign && is_in_time_window(timestamp, o.start, o.end))?;
-
-        Some(exc.zone)
-    }
-
-    /// Check if the callsign was used in an invalid operation.
-    ///
-    /// # Arguments
-    ///
-    /// - `callsign`: Complete callsign
-    /// - `timestamp`: Timestamp to use for the check
-    ///
-    /// # Returns
-    ///
-    /// True if the operation is invalid, false otherwise
-    pub fn is_invalid_operation(&self, callsign: &str, timestamp: &DateTime<Utc>) -> bool {
-        self.invalid_operations
-            .list
-            .iter()
-            .any(|o| o.call == callsign && is_in_time_window(timestamp, o.start, o.end))
-    }
 }
 
-/// Check whether a timestamp is within an optional start and end timestamp.
+/// Check whether a timestamp is within an optional start and end time range.
 ///
 /// # Arguments
 ///
@@ -157,7 +106,7 @@ impl ClubLog {
 /// # Returns
 ///
 /// True if time timestamp is within the time window, false otherwise
-fn is_in_time_window(
+pub fn is_in_time_window(
     timestamp: &DateTime<Utc>,
     start: Option<DateTime<Utc>>,
     end: Option<DateTime<Utc>>,

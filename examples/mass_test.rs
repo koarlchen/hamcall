@@ -4,6 +4,8 @@ use std::env;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 
+use hamcall::clublogquery::ClubLogQuery;
+
 // Usage `call CLUBLOGXML FNAME`
 pub fn main() {
     let args: Vec<String> = env::args().collect();
@@ -16,25 +18,27 @@ pub fn main() {
 
         let raw = fs::read_to_string(xml).unwrap();
         let clublog = clublog::ClubLog::parse(&raw).unwrap();
+        let clublogmap = hamcall::clublogmap::ClubLogMap::from(clublog);
 
         let csv = read_csv(fname);
 
         for entry in csv {
-            match call::analyze_callsign(&clublog, &entry.0, &entry.2) {
+            match call::analyze_callsign(&clublogmap, &entry.0, &entry.2) {
                 Ok(c) => {
                     if entry.1 != c.adif {
-                        let entity_theirs = &clublog
+                        let entity_theirs = &clublogmap
                             .get_entity(entry.1, &entry.2)
                             .map_or("", |e| &e.name);
-                        let entity_mine =
-                            &clublog.get_entity(c.adif, &entry.2).map_or("", |e| &e.name);
+                        let entity_mine = &clublogmap
+                            .get_entity(c.adif, &entry.2)
+                            .map_or("", |e| &e.name);
                         eprintln!(
                             "{} => ADIF mismatch (theirs={} ({:?}) != mine={} ({:?}))",
                             entry.0, entry.1, entity_theirs, c.adif, entity_mine
                         );
                         continue;
                     }
-                    if !call::check_whitelist(&clublog, &c, &entry.2) {
+                    if !call::check_whitelist(&clublogmap, &c, &entry.2) {
                         eprintln!(
                             "{} => Callsign matches to entity {} but is not whitelisted",
                             &entry.0,
