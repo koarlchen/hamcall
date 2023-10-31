@@ -5,10 +5,9 @@
 //! HashMap based implementation of the [ClubLogQuery] trait.
 
 use crate::clublog::{
-    is_in_time_window, Adif, CallsignException, ClubLog, CqZone, Entity, InvalidOperation, Prefix,
-    ZoneException,
+    Adif, CallsignException, ClubLog, CqZone, Entity, InvalidOperation, Prefix, ZoneException,
 };
-use crate::clublogquery::ClubLogQuery;
+use crate::clublogquery::{is_in_time_window, ClubLogQuery};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::convert::From;

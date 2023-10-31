@@ -73,3 +73,27 @@ pub trait ClubLogQuery {
     /// True if the operation is invalid, false otherwise
     fn is_invalid_operation(&self, callsign: &str, timestamp: &DateTime<Utc>) -> bool;
 }
+
+/// Check whether a timestamp is within an optional start and end time range.
+///
+/// # Arguments
+///
+/// - `timestamp`: Timestamp to use for the check
+/// - `start`: Start timestamp of the time window
+/// - `end`: End timestamp of the time window
+///
+/// # Returns
+///
+/// True if time timestamp is within the time window, false otherwise
+pub fn is_in_time_window(
+    timestamp: &DateTime<Utc>,
+    start: Option<DateTime<Utc>>,
+    end: Option<DateTime<Utc>>,
+) -> bool {
+    match (start, end) {
+        (Some(tstart), Some(tend)) => timestamp >= &tstart && timestamp <= &tend,
+        (Some(tstart), None) => timestamp >= &tstart,
+        (None, Some(tend)) => timestamp <= &tend,
+        (None, None) => true,
+    }
+}
