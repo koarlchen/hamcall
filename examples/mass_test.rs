@@ -1,28 +1,38 @@
 use chrono::{DateTime, Utc};
+use hamcall::clublogquery::ClubLogQuery;
 use hamcall::{call, clublog};
 use std::env;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 
-use hamcall::clublogquery::ClubLogQuery;
-
-// Usage `call CLUBLOGXML FNAME`
+/// Implementation to test multiple QSOs at once.
+/// Reads the test data from a CSV file with the format `<CALL>,<DXCC>,<QSO_DATE>,<TIME_ON>` where each column references an ADIF field with that name.
+/// Afterwards the callsign is anlyzed and the comparison results will be printed to the console.
+/// Matches are printed to stdout, mismatches are printed on stderr.
+///
+/// Usage: `mass_test <CLUBLOGXML> <CSVFILE>`
 pub fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 3 {
-        println!("Usage `call CLUBLOGXML FNAME`");
+        println!("Usage: `mass_test <CLUBLOGXML> <CSVFILE>`");
     } else {
         let xml = &args[1];
         let fname = &args[2];
 
+        // Read contents of the ClubLog XML file
         let raw = fs::read_to_string(xml).unwrap();
+        // Parse the contents into an object
         let clublog = clublog::ClubLog::parse(&raw).unwrap();
+        // Convert the object for faster access times
         let clublogmap = hamcall::clublogmap::ClubLogMap::from(clublog);
 
+        // Read csv file
         let csv = read_csv(fname);
 
+        // Loop through each entry
         for entry in csv {
+            // Analyze callsign and print comparison results
             match call::analyze_callsign(&clublogmap, &entry.0, &entry.2) {
                 Ok(c) => {
                     if entry.1 != c.adif {
@@ -57,7 +67,7 @@ pub fn main() {
 /// Read csv file with test data.
 ///
 /// The csv file is assumed to have the following columns where the column names refer to ADIF fields
-/// <CALL>,<ADIF>,<QSO_DATE>,<TIME_ON>
+/// `<CALL>,<DXCC>,<QSO_DATE>,<TIME_ON>``
 fn read_csv(fname: &str) -> Vec<(String, clublog::Adif, DateTime<Utc>)> {
     let mut result: Vec<(String, clublog::Adif, DateTime<Utc>)> = Vec::new();
 
