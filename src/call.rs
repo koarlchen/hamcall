@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use thiserror::Error;
 
-/// Representation of a callsign together with detailed information like the name of the entity or ADIF DXCC identifier.
+/// Representation of a callsign together with detailed information like the name of the entity or the ADIF DXCC identifier.
 #[derive(Debug, PartialEq)]
 pub struct Callsign {
     /// Complete callsign
@@ -587,7 +587,7 @@ fn get_prefix<'a>(
         let slice = &potential_prefix[0..cnt];
 
         // Append all single chars to the call as <call>/<appendix> and check if the prefix is valid
-        // This check is required for prefixes like SV/A where the callsign SV1ABC/A shall match to
+        // This check is required for prefixes like SV/A where the callsign SV1ABC/A shall match too
         if let Some(pref) = single_char_appendices
             .iter()
             .find_map(|a| clublog.get_prefix(&format!("{}/{}", slice, a), timestamp))
