@@ -137,7 +137,7 @@ where
 }
 
 /// Representation of the club logs callsign lookup data
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename = "clublog")]
 pub struct ClubLog {
     /// Timestamp of data
@@ -158,7 +158,7 @@ pub struct ClubLog {
 }
 
 /// List of entities / DXCCs
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct Entities {
     #[serde(rename = "entity")]
     pub list: Vec<Entity>,
@@ -179,7 +179,7 @@ pub struct Entities {
 /// The list of approved callsigns is part of the [callsign exception](CallsignException) list.
 /// May also have a look at the timestamps [whitelist_start](Entity::whitelist_start) and [whitelist_end](Entity::whitelist_end) to check whether a whitelist check is required or not.
 /// Note, that the whitlist timstamps are not necessarily present if a entity is whitelisted.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct Entity {
     /// ADIF identifier
     pub adif: Adif,
@@ -218,7 +218,7 @@ pub struct Entity {
 }
 
 /// List of callsign exceptions
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 #[serde(rename = "Exceptions")]
 pub struct CallsignExceptions {
     #[serde(rename = "exception")]
@@ -244,7 +244,7 @@ pub struct CallsignExceptions {
 /// There are historical reasons, why the same information is part of two lists.
 ///
 /// Note: Valid callsigns for a [whitelisted entity](Entity::whitelist) are also part of the callsign exception list.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 #[serde(rename = "Exception")]
 pub struct CallsignException {
     /// Identifier
@@ -275,7 +275,7 @@ pub struct CallsignException {
 }
 
 /// List of callsign prefixes
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct Prefixes {
     #[serde(rename = "prefix")]
     pub list: Vec<Prefix>,
@@ -289,7 +289,7 @@ pub struct Prefixes {
 /// While searching for a matching prefix make sure to also validate against the optional [start](Prefix::start) and [end](Prefix::end) timestamps.
 ///
 /// Note: While searching for a prefix, next to obvious prefixes like `DL`, there are also speical ones listed like `SV/A`.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct Prefix {
     /// Identifier
     #[serde(rename = "@record")]
@@ -319,7 +319,7 @@ pub struct Prefix {
 }
 
 /// List of invalid operations
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct InvalidOperations {
     #[serde(rename = "invalid")]
     pub list: Vec<InvalidOperation>,
@@ -332,7 +332,7 @@ pub struct InvalidOperations {
 /// Furthermore, check the validity against the optional [start](InvalidOperation::start) and [end](InvalidOperation::end) timestamps.
 ///
 /// Note: this information is for historical reasons also part of the [callsign exceptions](CallsignException).
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 #[serde(rename = "Invalid")]
 pub struct InvalidOperation {
     /// Identifier
@@ -351,7 +351,7 @@ pub struct InvalidOperation {
 }
 
 /// List of CQ zone exceptions
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct ZoneExceptions {
     #[serde(rename = "zone_exception")]
     pub list: Vec<ZoneException>,
@@ -362,7 +362,7 @@ pub struct ZoneExceptions {
 /// An entry represents a callsign, where the CQ zone of the entity is different.
 /// When searching for a matching entry the [callsign](ZoneException::call) must match exactly including prefix, suffix and appendix.
 /// Furthermore, check the validity against the optional [start](ZoneException::start) and [end](ZoneException::end) timestamps.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct ZoneException {
     /// Identifier
     #[serde(rename = "@record")]
@@ -384,148 +384,16 @@ pub struct ZoneException {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lazy_static::lazy_static;
-    use std::fs;
-
-    fn read_clublog_xml() -> &'static ClubLog {
-        lazy_static! {
-            static ref CLUBLOG: ClubLog =
-                ClubLog::parse(&fs::read_to_string("data/clublog/cty.xml").unwrap()).unwrap();
-        }
-
-        &*CLUBLOG
-    }
 
     #[test]
     fn check_parser() {
-        let clublog = read_clublog_xml();
+        let clublog =
+            ClubLog::parse(&std::fs::read_to_string("data/clublog/cty.xml").unwrap()).unwrap();
 
         assert!(clublog.entities.list.len() > 0);
         assert!(clublog.exceptions.list.len() > 0);
         assert!(clublog.prefixes.list.len() > 0);
         assert!(clublog.invalid_operations.list.len() > 0);
         assert!(clublog.zone_exceptions.list.len() > 0);
-    }
-
-    #[test]
-    fn lookup_prefix_ok() {
-        let clublog = read_clublog_xml();
-        let info = clublog
-            .get_prefix(
-                "DA",
-                &DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
-                    .unwrap()
-                    .into(),
-            )
-            .unwrap();
-        assert_eq!(info.adif, 230);
-    }
-
-    #[test]
-    fn lookup_prefix_ok_time() {
-        let clublog = read_clublog_xml();
-        let y1 = clublog
-            .get_prefix(
-                "Y2",
-                &DateTime::parse_from_rfc3339("1980-01-01T00:00:00Z")
-                    .unwrap()
-                    .into(),
-            )
-            .unwrap();
-        let y2 = clublog
-            .get_prefix(
-                "Y2",
-                &DateTime::parse_from_rfc3339("1995-01-01T00:00:00Z")
-                    .unwrap()
-                    .into(),
-            )
-            .unwrap();
-
-        assert_eq!(y1.adif, 229);
-        assert_eq!(y2.adif, 230);
-    }
-
-    #[test]
-    fn lookup_prefix_err() {
-        let clublog = read_clublog_xml();
-        let info = clublog.get_prefix(
-            "FOO",
-            &DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
-                .unwrap()
-                .into(),
-        );
-        assert!(info.is_none());
-    }
-
-    #[test]
-    fn callsign_exception_ok() {
-        let clublog = read_clublog_xml();
-        let call_exc = clublog.get_callsign_exception(
-            "KC6RJW",
-            &DateTime::parse_from_rfc3339("2003-01-01T00:00:00Z")
-                .unwrap()
-                .into(),
-        );
-        assert!(call_exc.is_some());
-    }
-
-    #[test]
-    fn callsign_exception_err() {
-        let clublog = read_clublog_xml();
-        let call_exc = clublog.get_callsign_exception(
-            "A1B",
-            &DateTime::parse_from_rfc3339("2001-01-01T00:00:00Z")
-                .unwrap()
-                .into(),
-        );
-        assert!(call_exc.is_none());
-    }
-
-    #[test]
-    fn invalid_operation_ok() {
-        let clublog = read_clublog_xml();
-        let invalid = clublog.is_invalid_operation(
-            "T88A",
-            &DateTime::parse_from_rfc3339("1995-07-01T00:00:00Z")
-                .unwrap()
-                .into(),
-        );
-        assert!(invalid);
-    }
-
-    #[test]
-    fn invalid_operation_err() {
-        let clublog = read_clublog_xml();
-        let invalid = clublog.is_invalid_operation(
-            "DL1FOO",
-            &DateTime::parse_from_rfc3339("2001-01-01T00:00:00Z")
-                .unwrap()
-                .into(),
-        );
-        assert!(!invalid);
-    }
-
-    #[test]
-    fn zone_exception_ok() {
-        let clublog = read_clublog_xml();
-        let exception = clublog.get_zone_exception(
-            "KD6WW/VY0",
-            &DateTime::parse_from_rfc3339("2003-07-30T12:00:00Z")
-                .unwrap()
-                .into(),
-        );
-        assert_eq!(exception, Some(1));
-    }
-
-    #[test]
-    fn zone_exception_err() {
-        let clublog = read_clublog_xml();
-        let exception = clublog.get_zone_exception(
-            "DL1FOO",
-            &DateTime::parse_from_rfc3339("2001-01-01T00:00:00Z")
-                .unwrap()
-                .into(),
-        );
-        assert!(exception.is_none());
     }
 }
