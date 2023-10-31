@@ -191,7 +191,7 @@ enum PartType {
 }
 
 /// State of the call element classification statemachine
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq)]
 enum State {
     /// No prefix found so far
     NoPrefix,
