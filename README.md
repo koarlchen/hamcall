@@ -9,7 +9,8 @@ Based on the data, an analyzer for callsigns is implemented to get further infor
 Simple applications within the folder `examples/` show the basic usage of the library.
 Next to that, both modules offer a few tests.
 These tests assume a ClubLog XML file to be available under `data/clublog/cty.xml`.
-While developing and testing the library, the `cty.xml` with the datestring `2023-09-22T07:31:24+00:00` was used in combination with the XML schema file `cty.xsd` downloaded on the same day.
+The implementation happend mainly with the `cty.xml` in its version `2023-09-22T07:31:24+00:00` together with the `cty.xsd` downloaded on the same day.
+The latest tested version is the `2023-11-25T20:31:27+00:00`.
 Future changes to the files may break the given code.
 Apparently, the files are not versioned except for the timestamp within the `cty.xml`.
 On how to obtain a `cty.xml` or rather an API key just have a look at the ClubLog website.
