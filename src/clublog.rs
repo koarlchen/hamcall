@@ -19,7 +19,7 @@ pub type Adif = u16;
 pub type CqZone = u8;
 
 /// Record identifier
-pub type RecordId = u16;
+pub type RecordId = u32;
 
 /// Special value for the entity of a callsign exception that is invalid
 pub const CALLSIGN_EXCEPTION_INVALID: &str = "INVALID";
