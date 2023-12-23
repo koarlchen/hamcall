@@ -46,58 +46,7 @@ impl Callsign {
         self.adif == ADIF_ID_NO_DXCC
     }
 
-    /// Instantiate a new maritime mobile callsign
-    ///
-    /// # Arguments
-    ///
-    /// - `call`: Callsign
-    ///
-    /// # Returns
-    ///
-    /// Callsign struct
-    fn new_maritime_mobile(call: &str) -> Callsign {
-        Callsign {
-            call: String::from(call),
-            adif: ADIF_ID_NO_DXCC,
-            dxcc: None,
-            cqzone: None,
-            continent: None,
-            longitude: None,
-            latitude: None,
-        }
-    }
-
-    /// Instantiate a new aeronautical mobile callsign
-    ///
-    /// # Arguments
-    ///
-    /// - `call`: Callsign
-    ///
-    /// # Returns
-    ///
-    /// Callsign struct
-    fn new_aeronautical_mobile(call: &str) -> Callsign {
-        Callsign {
-            call: String::from(call),
-            adif: ADIF_ID_NO_DXCC,
-            dxcc: None,
-            cqzone: None,
-            continent: None,
-            longitude: None,
-            latitude: None,
-        }
-    }
-
-    /// Instantiate a new satellite callsign
-    ///
-    /// # Arguments
-    ///
-    /// - `call`: Callsign
-    ///
-    /// # Returns
-    ///
-    /// Callsign struct
-    fn new_satellite(call: &str) -> Callsign {
+    fn new_special_entity(call: &str) -> Callsign {
         Callsign {
             call: String::from(call),
             adif: ADIF_ID_NO_DXCC,
@@ -201,17 +150,6 @@ enum State {
     DoublePrefix,
     /// Found complete prefix, only appendices may follow
     PrefixComplete(u8),
-}
-
-/// Appendix that indicates that the calls entity may be ignored
-#[derive(PartialEq, Eq, Clone)]
-enum SpecialEntityAppendix {
-    /// Maritime Mobile (/MM)
-    Mm,
-    /// Aeronautical Mobile (/AM)
-    Am,
-    /// Satellite, Internet or Repeater (/SAT)
-    Sat,
 }
 
 /// Check if the callsign is whitelisted if the whitelist option is enabled for the entity of the callsign at the given point in time.
@@ -363,12 +301,8 @@ pub fn analyze_callsign(
 
             // Special appendix like /AM or /MM is present
             // Example: W1ABC/AM
-            if let Some(appendix) = is_no_entity_by_appendix(&parts[1..])? {
-                return Ok(match appendix {
-                    SpecialEntityAppendix::Am => Callsign::new_aeronautical_mobile(call),
-                    SpecialEntityAppendix::Mm => Callsign::new_maritime_mobile(call),
-                    SpecialEntityAppendix::Sat => Callsign::new_satellite(call),
-                });
+            if is_no_entity_by_appendix(&parts[1..])? {
+                return Ok(Callsign::new_special_entity(call));
             }
 
             // Check if a single digit appendix is present
@@ -505,8 +439,8 @@ fn is_different_prefix_by_single_digit_appendix<'a>(
     Ok(get_prefix(clublog, &new_homecall, timestamp, appendices).map(|i| i.0))
 }
 
-/// Check if a special appendix is part of the appendices list.
-/// If such a speical appendix is present, it indicates that the actual prefix of the overall shall be ignored.
+/// Check if a special appendix (`MM`, `AM`, `SAT`) is part of the appendices list.
+/// If such a speical appendix is present, it indicates that the actual prefix of the overall call shall be ignored.
 ///
 /// Example: /MM indicates maritime mobile and therefore does not reference an entity
 ///
@@ -516,27 +450,19 @@ fn is_different_prefix_by_single_digit_appendix<'a>(
 ///
 /// # Returns
 ///
-/// A potential special entity appendix or an error.
-fn is_no_entity_by_appendix(
-    appendices: &[&str],
-) -> Result<Option<SpecialEntityAppendix>, CallsignError> {
-    // Search for special appendices
-    let a: Vec<SpecialEntityAppendix> = appendices
+/// True if a special prefix is present, false if not. Otherwise an error is returned.
+fn is_no_entity_by_appendix(appendices: &[&str]) -> Result<bool, CallsignError> {
+    let special_cnt = appendices
         .iter()
-        .filter_map(|e| match *e {
-            "MM" => Some(SpecialEntityAppendix::Mm),
-            "AM" => Some(SpecialEntityAppendix::Am),
-            "SAT" => Some(SpecialEntityAppendix::Sat),
-            _ => None,
-        })
-        .collect();
+        .filter(|e| **e == "MM" || **e == "AM" || **e == "SAT")
+        .count();
 
     // Act based on how much special appendices were found
-    match a.len() {
+    match special_cnt {
         // Zero found, nothing to do
-        0 => Ok(None),
+        0 => Ok(false),
         // Single one found, return it
-        1 => Ok(Some(a[0].clone())),
+        1 => Ok(true),
         // Multiple found, throw an error -> which one to choose?
         _ => Err(CallsignError::MultipleSpecialAppendices),
     }
