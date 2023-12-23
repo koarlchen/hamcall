@@ -605,7 +605,7 @@ mod tests {
     }
 
     #[test]
-    fn special_appendix() {
+    fn special_appendix_ok() {
         let calls = vec![
             // AM
             "W1AW/AM",
@@ -636,6 +636,45 @@ mod tests {
             )
             .unwrap();
             assert!(res.is_special_entity());
+        }
+    }
+
+    #[test]
+    fn special_appendix_err() {
+        let calls = vec![
+            // AM
+            "W1AW/AM/SAT",
+            "W1AM/AM/MM",
+            "W1AW/AM/AM",
+            "W1AW/AM/MM/P",
+            "W1AW/P/AM/MM",
+            // MM
+            "W1AW/MM/SAT",
+            "W1AM/MM/MM",
+            "W1AW/MM/AM",
+            "W1AW/MM/MM/P",
+            "W1AW/P/MM/AM",
+            // SAT
+            "W1AW/SAT/SAT",
+            "W1AM/SAT/MM",
+            "W1AW/SAT/AM",
+            "W1AW/SAT/MM/P",
+            "W1AW/P/SAT/AM",
+            // Multiple numbers
+            "W1AW/8/9",
+        ];
+
+        let clublog = read_clublog_xml();
+
+        for call in calls.iter() {
+            let res = analyze_callsign(
+                clublog,
+                call,
+                &DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                    .unwrap()
+                    .into(),
+            );
+            assert_eq!(res, Err(CallsignError::MultipleSpecialAppendices));
         }
     }
 
@@ -702,6 +741,25 @@ mod tests {
     }
 
     #[test]
+    fn invalid_operation() {
+        let calls = vec![
+            ("T8T", "1995-05-01T01:00:00Z"),       // record 490
+            ("3D2/N1GXE", "2021-01-01T00:00:00Z"), // record 1155
+        ];
+
+        let clublog = read_clublog_xml();
+
+        for call in calls.iter() {
+            let res = analyze_callsign(
+                clublog,
+                call.0,
+                &DateTime::parse_from_rfc3339(call.1).unwrap().into(),
+            );
+            assert_eq!(res, Err(CallsignError::InvalidOperation));
+        }
+    }
+
+    #[test]
     fn genuine_calls() {
         let calls = vec![
             ("W1ABC", 291),     // Basic call
@@ -734,6 +792,42 @@ mod tests {
             )
             .unwrap();
             assert_eq!(res.adif, call.1);
+        }
+    }
+
+    #[test]
+    fn invalid_format() {
+        let calls = vec!["W1AW/", "/W1AW", "W1ABC.", "W1ABC/.", "W1<ABC>"];
+
+        let clublog = read_clublog_xml();
+
+        for call in calls.iter() {
+            let res = analyze_callsign(
+                clublog,
+                call,
+                &DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                    .unwrap()
+                    .into(),
+            );
+            assert_eq!(res, Err(CallsignError::BasicFormat));
+        }
+    }
+
+    #[test]
+    fn too_much_prefixes() {
+        let calls = vec!["W/K/W1AW", "W1AW/K/W", "K/W1AW/W"];
+
+        let clublog = read_clublog_xml();
+
+        for call in calls.iter() {
+            let res = analyze_callsign(
+                clublog,
+                call,
+                &DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+                    .unwrap()
+                    .into(),
+            );
+            assert_eq!(res, Err(CallsignError::TooMuchPrefixes));
         }
     }
 }
