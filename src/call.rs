@@ -605,46 +605,24 @@ mod tests {
     }
 
     #[test]
-    fn special_appendix_am() {
-        let calls = vec!["W1AW/AM", "W1AM/P/AM", "W1AW/AM/P", "W1AW/P/AM/7"];
-
-        let clublog = read_clublog_xml();
-
-        for call in calls.iter() {
-            let res = analyze_callsign(
-                clublog,
-                call,
-                &DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
-                    .unwrap()
-                    .into(),
-            )
-            .unwrap();
-            assert!(res.is_special_entity());
-        }
-    }
-
-    #[test]
-    fn special_appendix_mm() {
-        let calls = vec!["W1AW/MM", "W1AM/P/MM", "W1AW/MM/P", "W1AW/P/MM/7"];
-
-        let clublog = read_clublog_xml();
-
-        for call in calls.iter() {
-            let res = analyze_callsign(
-                clublog,
-                call,
-                &DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
-                    .unwrap()
-                    .into(),
-            )
-            .unwrap();
-            assert!(res.is_special_entity());
-        }
-    }
-
-    #[test]
-    fn special_appendix_sat() {
-        let calls = vec!["W1AW/SAT", "W1AM/P/SAT", "W1AW/SAT/P", "W1AW/P/SAT/7"];
+    fn special_appendix() {
+        let calls = vec![
+            // AM
+            "W1AW/AM",
+            "W1AM/P/AM",
+            "W1AW/AM/P",
+            "W1AW/P/AM/7",
+            // MM
+            "W1AW/MM",
+            "W1AM/P/MM",
+            "W1AW/MM/P",
+            "W1AW/P/MM/7",
+            // SAT
+            "W1AW/SAT",
+            "W1AM/P/SAT",
+            "W1AW/SAT/P",
+            "W1AW/P/SAT/7",
+        ];
 
         let clublog = read_clublog_xml();
 
