@@ -46,6 +46,15 @@ impl Callsign {
         self.adif == ADIF_ID_NO_DXCC
     }
 
+    /// Instantiate a new callsign that does not belong to an entity (e.g. /MM, /AM, /SAT)
+    ///
+    /// # Arguments
+    ///
+    /// - `call`: Callsign
+    ///
+    /// # Returns
+    ///
+    /// Callsign struct
     fn new_special_entity(call: &str) -> Callsign {
         Callsign {
             call: String::from(call),
