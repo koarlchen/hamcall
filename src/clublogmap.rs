@@ -29,12 +29,12 @@ impl From<ClubLog> for ClubLogMap {
             entities.insert(entity.adif, entity);
         }
 
-        let mut exceptions: HashMap<String, Vec<CallsignException>> = HashMap::new();
+        let mut callsign_exceptions: HashMap<String, Vec<CallsignException>> = HashMap::new();
         for exception in clublog.exceptions.list.into_iter() {
-            if let Some(value) = exceptions.get_mut(&exception.call) {
+            if let Some(value) = callsign_exceptions.get_mut(&exception.call) {
                 value.push(exception);
             } else {
-                exceptions.insert(exception.call.clone(), vec![exception]);
+                callsign_exceptions.insert(exception.call.clone(), vec![exception]);
             }
         }
 
@@ -67,7 +67,7 @@ impl From<ClubLog> for ClubLogMap {
 
         ClubLogMap {
             entities,
-            callsign_exceptions: exceptions,
+            callsign_exceptions,
             prefixes,
             invalid_operations,
             zone_exceptions,
