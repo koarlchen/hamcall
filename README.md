@@ -8,12 +8,13 @@ Based on the data, an analyzer for callsigns is implemented to get further infor
 
 Simple applications within the folder `examples/` show the basic usage of the library.
 Next to that, both modules offer a few tests.
-These tests assume a ClubLog XML file to be available under `data/clublog/cty.xml`.
-The implementation happend mainly with the `cty.xml` in its version `2023-09-22T07:31:24+00:00` together with the `cty.xsd` downloaded on the same day.
+These tests assume a ClubLog XML file to be available at `data/clublog/cty.xml`.
+The implementation happend mainly with the `cty.xml` that lists the timestamp `2023-09-22T07:31:24+00:00` together with the `cty.xsd` downloaded at the same time.
 The latest tested version is the `2023-11-25T20:31:27+00:00`.
 Future changes to the files may break the given code.
 Apparently, the files are not versioned except for the timestamp within the `cty.xml`.
-On how to obtain a `cty.xml` or rather an API key just have a look at the ClubLog website.
+
+On how to obtain a `cty.xml` or rather an API key to download the file just have a look at the ClubLog website.
 
 
 ## Callsign Analysis
@@ -22,15 +23,16 @@ Analyzing callsigns is not that easy.
 Next to obvious callsigns like `DL1ABC` or `F/DL1ABC` there are also tricky ones like `SV1DC/A` (SV/A is Mount Athos, SV is Greece. This exact callsign is valid for Mount Athos, but for example `SV1ABC/A` does not have to be Mount Athos), `CE0Y/PG5M` (which of both parts is the prefix?) or `F0BAU/FC` (prefix is in the back!).
 The given implementation should handle quite a few of those calls but will never be assumed to analyze all callsigns, especially the quite special ones, correctly.
 You may have a look at the section of known limitations below.
-If you are curious about what type of special calls are covered, just have a look at the tests within the file [call.rs](src/call.rs).
+If you are curious about what type of special calls are covered, just have a look at the tests.
 
 After all, the entity named on the received QSL card should be deemed to be the correct one. You may also use the online callsign analyzer of ClubLog directly. Even though, the data used here is provided by them, they sometimes have more information that is not part of the XML file.
 
 
 ## Error Reports
 
-If you come across a callsign where the library returns unexpected information (e.g. the wrong entity or continent) or the call analysis returns an error, first have a look into the ClubLog XML file yourself and check your callsign against the information there.
-If you were able to find an entry that leads to a different interpretation of the callsign, open an issue with the callsign you expect to be mistakenly analyzed the wrong way together with the timestamp, the date of the ClubLog XML and according to which entry you would expect different information.
+If you come across a callsign where the library returns unexpected information like the wrong entity or continent, or the call analysis returns an error, first have a look into the ClubLog XML file yourself and check your callsign against the information there.
+If you were able to find an entry that leads to a different interpretation of the callsign, open an issue with the callsign you expect to be mistakenly analyzed the wrong way together with the timestamp, the date of the ClubLog XML and according to which entry (reference `record` attribute) you would expect different information.
+
 
 ## Known Limitations
 
