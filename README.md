@@ -40,9 +40,9 @@ If you were able to find an entry that leads to a different interpretation of th
   Callsigns from Argentina may use a single character appendix, e.g. `LS4AA/F`.
   This may be true for other countries as well.
   In this special case the additional `/F` indicates the entity France which will actually be returned by the callsign analysis routine.
-  The fact, that these calls are operated from Argentia cannot be covered by using solely the ClubLog XML data and would require more specialized rules exceeding the information available within the XML file.
+  The fact, that these calls are operated from Argentina cannot be covered by using solely the ClubLog XML data and would require more specialized rules exceeding the information available within the XML file.
 - `3D2/R`, `SV/A`:
   The prefix list of the ClubLog XML contains special entries like `SV/A` or `3D2/R`.
   As of now the interpretation of these prefixes is not as clear as it should be.
   As noted above the call `SV1ABC/A` may not be valid for Mount Athos (`SV/A`).
-  Since Mount Athos is currently whitelisted, this is not such a big deal, but not all special prefixes reference entites that are whitelisted.
+  Since Mount Athos is currently whitelisted, this is not such a big deal, but not all special prefixes reference entities that are whitelisted.

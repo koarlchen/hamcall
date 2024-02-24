@@ -178,7 +178,7 @@ pub struct Entities {
 /// Therefore only approved callsigns shall be logged for that entity.
 /// The list of approved callsigns is part of the [callsign exception](CallsignException) list.
 /// May also have a look at the timestamps [whitelist_start](Entity::whitelist_start) and [whitelist_end](Entity::whitelist_end) to check whether a whitelist check is required or not.
-/// Note, that the whitlist timstamps are not necessarily present if a entity is whitelisted.
+/// Note, that the whitelist timstamps are not necessarily present if a entity is whitelisted.
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct Entity {
     /// ADIF identifier
@@ -288,7 +288,7 @@ pub struct Prefixes {
 /// Even all other fields of that two entries feature the same data.
 /// While searching for a matching prefix make sure to also validate against the optional [start](Prefix::start) and [end](Prefix::end) timestamps.
 ///
-/// Note: While searching for a prefix, next to obvious prefixes like `DL`, there are also speical ones listed like `SV/A`.
+/// Note: While searching for a prefix, next to obvious prefixes like `DL`, there are also special ones listed like `SV/A`.
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct Prefix {
     /// Identifier
